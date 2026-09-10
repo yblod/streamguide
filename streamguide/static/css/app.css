@@ -447,6 +447,10 @@ code { background: rgba(120,120,140,0.15); padding: 1px 6px; border-radius: 6px;
   .card .q { width: 30px; height: 30px; opacity: 0.88; }
   .card .q.on { opacity: 1; }
   .card .badges { right: 8px; }
+  /* Status-Badge (🔖/📺/✕) doppelt sich mit dem farbig markierten Schnellaktions-Button → nur den Button zeigen */
+  .card:has(.quick) .badge-status.watchlist,
+  .card:has(.quick) .badge-status.watching,
+  .card:has(.quick) .badge-status.disliked { display: none; }
   .modal .poster .play { opacity: 0.75; }
   .person-card .q.star { opacity: 0.75; }
   .person-card.fav .q.star { opacity: 1; }

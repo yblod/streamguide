@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 – 2026-09-11
+
+- Touch: Status-Symbol (🔖/📺/✕) erschien auf Karten doppelt, als Badge und als markierter Schnellaktions-Button.
+  Auf Touch-Geräten zeigt jetzt nur der Button den Status; Maus-Ansicht unverändert.
+
 ## 1.0.2 – 2026-09-11
 
 - Kopfzeile auf Tablets im Querformat (iPad): kompaktere Navigation, der Theme-Schalter ragte rechts aus der Leiste.

@@ -28,6 +28,9 @@ def _load_env_file() -> None:
 
 
 def _load_addon_options() -> None:
+    # Im Add-on-Container ist /data immer vorhanden; s6 reicht ENV aus dem Dockerfile nicht zuverlässig durch.
+    if OPTIONS.parent.is_dir():
+        os.environ.setdefault("STREAMGUIDE_DATA_DIR", str(OPTIONS.parent))
     if not OPTIONS.exists():
         return
     try:

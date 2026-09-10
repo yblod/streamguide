@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import api, auth, db, imdb, jobs, justwatch, sync, tmdb
@@ -61,6 +61,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="StreamGuide", version=VERSION, lifespan=lifespan)
 app.include_router(api.router)
+# Frontend-Dateien zusätzlich unter einem versionierten Pfad: index.html verweist auf /static/v<Version>/…,
+# damit Browser (v. a. Safari mit ES-Modulen) nach einem Update garantiert frische Dateien laden.
+STATIC_VERSIONED = f"/static/v{VERSION}"
+app.mount(STATIC_VERSIONED, StaticFiles(directory=STATIC), name="static_versioned")
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
@@ -79,8 +83,9 @@ async def guard_and_cache(request: Request, call_next):
 
 
 @app.get("/", include_in_schema=False)
-async def index() -> FileResponse:
-    return FileResponse(STATIC / "index.html")
+async def index() -> HTMLResponse:
+    html = (STATIC / "index.html").read_text(encoding="utf-8").replace('"/static/', f'"{STATIC_VERSIONED}/')
+    return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/health", include_in_schema=False)

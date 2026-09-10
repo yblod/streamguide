@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.5 – 2026-09-11
+
+- Frontend-Dateien werden unter einem versionierten Pfad (`/static/v<Version>/…`) eingebunden. Safari auf dem iPad
+  hielt nach Updates alte JavaScript-Module trotz Neuladen fest; ab jetzt lädt jede Version garantiert frische Dateien.
+
 ## 1.0.4 – 2026-09-11
 
 - Touch: Das Ausblenden des doppelten Status-Badges griff in Safari nicht (CSS `:has()` nicht unterstützt);

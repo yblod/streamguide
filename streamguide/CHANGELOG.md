@@ -1,13 +1,16 @@
 # Changelog
 
-## 1.0.1 – 2026-09-11
+## 1.0.2 – 2026-09-11
 
-- Oberfläche und Doku ohne persönliche Angaben (Kontonamen, Domain, IP), da das Repository öffentlich ist.
-- Doku: Zugriff im Heimnetz über die IP statt `homeassistant.local`, Hinweise zum Cloudflared-Eintrag.
 - Kopfzeile auf Tablets im Querformat (iPad): kompaktere Navigation, der Theme-Schalter ragte rechts aus der Leiste.
 - Touch-Bedienung: Karten öffnen mit einem Tipp (vorher zwei, weil der erste Tipp nur den Hover-Zustand auslöste).
   Hover-Effekte gelten nur noch bei Maus/Trackpad; auf Touch-Geräten sind die Schnellaktionen dauerhaft rechts unter
   den Badges sichtbar, der Trailer-Button im Poster ebenfalls.
+
+## 1.0.1 – 2026-09-11
+
+- Oberfläche und Doku ohne persönliche Angaben (Kontonamen, Domain, IP), da das Repository öffentlich ist.
+- Doku: Zugriff im Heimnetz über die IP statt `homeassistant.local`, Hinweise zum Cloudflared-Eintrag.
 
 ## 1.0.0 – 2026-09-10
 

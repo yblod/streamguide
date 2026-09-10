@@ -4,6 +4,7 @@
 
 - Oberfläche und Doku ohne persönliche Angaben (Kontonamen, Domain, IP), da das Repository öffentlich ist.
 - Doku: Zugriff im Heimnetz über die IP statt `homeassistant.local`, Hinweise zum Cloudflared-Eintrag.
+- Kopfzeile auf Tablets im Querformat (iPad): kompaktere Navigation, der Theme-Schalter ragte rechts aus der Leiste.
 
 ## 1.0.0 – 2026-09-10
 

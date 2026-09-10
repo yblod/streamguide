@@ -91,15 +91,23 @@ p { margin: 0.4em 0; }
 }
 .brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.05rem; white-space: nowrap; }
 .brand-icon { font-size: 1.3rem; }
-.nav { display: flex; gap: 4px; flex: 1; justify-content: center; }
+.nav { display: flex; gap: 4px; flex: 1; justify-content: center; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.nav::-webkit-scrollbar { display: none; }
 .nav a {
-  display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
+  display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; flex-shrink: 0; white-space: nowrap;
   color: var(--muted); font-weight: 600; font-size: 0.92rem; transition: background 0.2s, color 0.2s;
 }
 .nav a:hover { background: var(--glass-hover); color: var(--text); }
 .nav a.active { background: var(--accent); color: white; box-shadow: 0 6px 18px rgba(91, 108, 255, 0.35); }
 .nav .ic { font-size: 1rem; }
-.topbar-right { display: flex; gap: 6px; }
+.topbar-right { display: flex; gap: 6px; flex-shrink: 0; }
+/* Tablet quer (z. B. iPad ~1180 px): kompakter, damit alle acht Einträge samt Theme-Schalter in die Leiste passen */
+@media (max-width: 1250px) {
+  .topbar { gap: 10px; padding-left: 12px; }
+  .brand { font-size: 1rem; }
+  .nav a { padding: 8px 9px; gap: 4px; font-size: 0.82rem; }
+  .nav .ic { font-size: 0.95rem; }
+}
 .icon-btn {
   width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--glass-border);
   background: var(--glass-strong); cursor: pointer; font-size: 1.05rem; display: grid; place-items: center;
@@ -107,7 +115,7 @@ p { margin: 0.4em 0; }
 }
 .icon-btn:hover { transform: scale(1.06); }
 
-@media (max-width: 860px) {
+@media (max-width: 1080px) {
   .topbar { margin: 8px 8px 0; }
   .brand-name { display: none; }
   .nav a span:not(.ic) { display: none; }

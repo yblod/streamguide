@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
     STREAMGUIDE_DATA_DIR=/data
 
 WORKDIR /opt/streamguide
+RUN mkdir -p /data
 
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir --break-system-packages -r requirements.txt

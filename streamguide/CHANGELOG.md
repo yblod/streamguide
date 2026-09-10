@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 – 2026-09-11
+
+- Touch: Das Ausblenden des doppelten Status-Badges griff in Safari nicht (CSS `:has()` nicht unterstützt);
+  jetzt über eine Klasse an der Karte, funktioniert in allen Browsern.
+
 ## 1.0.3 – 2026-09-11
 
 - Touch: Status-Symbol (🔖/📺/✕) erschien auf Karten doppelt, als Badge und als markierter Schnellaktions-Button.

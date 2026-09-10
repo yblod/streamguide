@@ -37,7 +37,7 @@ export function card(t, opts = {}) {
   const provs = [...(av.sub || []), ...(av.free || [])].slice(0, 3);
   const dim = provs.length ? [] : [...(av.other_sub || []), ...(av.other_free || [])].slice(0, 2);
   const u = t.user || {};
-  const el = h('div', { class: `card ${provs.length || dim.length ? 'has-provs' : ''}`, title: t.title, onClick: () => openTitle(t.media_type, t.tmdb_id, opts.onChange) },
+  const el = h('div', { class: `card ${provs.length || dim.length ? 'has-provs' : ''} ${opts.noQuick ? '' : 'has-quick'}`, title: t.title, onClick: () => openTitle(t.media_type, t.tmdb_id, opts.onChange) },
     t.poster_path ? h('img', { src: IMG(t.poster_path), loading: 'lazy', alt: '' }) : h('div', { class: 'noposter' }, t.media_type === 'tv' ? '📺' : '🎬'),
     h('div', { class: 'badges' },
       t.imdb_rating ? h('span', { class: 'badge-imdb' }, `★ ${t.imdb_rating.toFixed(1)}`) : (t.tmdb_rating ? h('span', { class: 'badge-status', style: { background: '#01b4e4', color: '#fff' } }, `${t.tmdb_rating.toFixed(1)}`) : h('span')),

@@ -12,8 +12,9 @@ Schauspieler-Favoriten. Datenquellen: TMDB, offizieller IMDb-Bewertungsdatensatz
    (Raspberry Pi 4: einige Minuten).
 4. Unter **Konfiguration** die Optionen setzen (siehe unten) → **Speichern** → **Starten**.
 
-Die App ist danach im Heimnetz unter `http://homeassistant.local:8765` erreichbar
-(bzw. `http://<IP-des-HA>:8765`). Es gibt bewusst keinen Eintrag in der HA-Seitenleiste (kein Ingress).
+Die App ist danach im Heimnetz unter `http://<IP-des-HA>:8765` erreichbar (z. B. `http://192.168.178.56:8765`
+oder `http://homeassistant.fritz.box:8765`). `homeassistant.local` funktioniert unter Windows oft nicht (mDNS liefert
+nur IPv6-Link-Local). Es gibt bewusst keinen Eintrag in der HA-Seitenleiste (kein Ingress).
 
 ## Optionen
 
@@ -67,5 +68,5 @@ Die Datenbank wird beim Start automatisch migriert.
 ## Fehlersuche
 
 - **Protokoll** des Add-ons zeigt Start (`StreamGuide <Version> – Daten in /data – Login aktiv …`) und Fehler.
-- `http://homeassistant.local:8765/health` liefert `{"ok": true}`; der Watchdog startet das Add-on sonst neu.
+- `http://<IP-des-HA>:8765/health` liefert `{"ok": true}`; der Watchdog startet das Add-on sonst neu.
 - Suche/Entdecken liefern Fehler 428 → kein TMDB-Schlüssel hinterlegt.

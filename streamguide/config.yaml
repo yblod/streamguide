@@ -12,7 +12,7 @@ init: false
 ports:
   8765/tcp: 8765
 ports_description:
-  8765/tcp: Web-Oberfläche im Heimnetz (http://homeassistant.local:8765)
+  8765/tcp: Web-Oberfläche im Heimnetz (http://<IP-des-HA>:8765)
 watchdog: http://[HOST]:[PORT:8765]/health
 options:
   tmdb_api_key: ""

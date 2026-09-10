@@ -1,0 +1,71 @@
+# StreamGuide – Home-Assistant-Add-on
+
+Persönlicher Streaming-Guide und Watch-Tracker für Deutschland: Watchlist-Verfügbarkeit bei den eigenen
+Anbietern, Entdecken-Filter (Jahr, Genre, IMDb, Land, FSK, Wiedergabesprache), Serientracking auf Folgen-Ebene,
+Schauspieler-Favoriten. Datenquellen: TMDB, offizieller IMDb-Bewertungsdatensatz, JustWatch (Sprachen).
+
+## Installation
+
+1. Home Assistant → **Einstellungen → Add-ons → Add-on Store** → Menü „⋮“ oben rechts → **Repositories**.
+2. `https://github.com/yblod/streamguide` eintragen → **Hinzufügen**.
+3. Seite neu laden, **StreamGuide** auswählen → **Installieren**. Das Image wird auf dem Gerät gebaut
+   (Raspberry Pi 4: einige Minuten).
+4. Unter **Konfiguration** die Optionen setzen (siehe unten) → **Speichern** → **Starten**.
+
+Die App ist danach im Heimnetz unter `http://homeassistant.local:8765` erreichbar
+(bzw. `http://<IP-des-HA>:8765`). Es gibt bewusst keinen Eintrag in der HA-Seitenleiste (kein Ingress).
+
+## Optionen
+
+| Option | Bedeutung |
+|---|---|
+| `tmdb_api_key` | TMDB-API-Schlüssel (v3 API Key oder v4 Read Access Token). Kann alternativ in der App unter Einstellungen hinterlegt werden; die Option hat Vorrang. |
+| `password` | App-Passwort. Leer = kein Login (nur sinnvoll, solange die App nicht von außen erreichbar ist). Ein neues Passwort meldet alle Geräte ab. |
+| `lan_without_login` | `true`: Zugriffe aus dem Heimnetz (private IP, nicht über den Cloudflare-Tunnel) brauchen kein Passwort. `false`: Passwort immer. |
+| `log_level` | `debug` (mit Zugriffslog), `info`, `warning`, `error`. |
+
+Das Login-Cookie gilt ein Jahr, ein Gerät muss sich also nur einmal anmelden.
+
+## Daten
+
+Alles liegt in `/data` des Add-ons (SQLite-Datenbank `streamguide.db`, Sicherungen unter `backups/`) und ist
+damit Teil der Home-Assistant-Backups. Beim ersten Start lädt die App den IMDb-Bewertungsdatensatz (~7 MB,
+1,7 Mio. Zeilen); das dauert auf dem Pi einige Minuten und läuft im Hintergrund.
+
+### Daten von der PC-Version übernehmen
+
+1. Auf dem PC in `F:\Claude\streamguide-ha`:
+   ```
+   python tools\export_pc_data.py
+   ```
+   Erzeugt `streamguide-pc-export.zip` aus der Datenbank der PC-Version (nur lesend, ohne IMDb-Datensatz).
+2. In der Add-on-App: **Einstellungen → Sicherung** → ZIP hineinziehen → bestätigen.
+3. Danach unter **Einstellungen → TMDB-Konto** prüfen, ob die Verbindung noch besteht; sonst neu verbinden.
+
+Dieselbe Funktion dient als Sicherung/Wiederherstellung der Add-on-Daten (**⬇ Sicherung herunterladen**).
+
+## Zugriff von außen (Cloudflared-Add-on)
+
+Das Add-on ist im HA-internen Netz unter dem Container-Hostnamen erreichbar. Der steht auf der
+Add-on-Infoseite unter **Hostname** und hat die Form `<hash>-streamguide`.
+
+Im Cloudflared-Add-on unter **Zusätzliche Hosts** (`additional_hosts`) ergänzen:
+
+```yaml
+- hostname: stream.yblod.de
+  service: http://<hash>-streamguide:8765
+```
+
+Cloudflared legt den DNS-Eintrag (CNAME) selbst an. Vorher unbedingt `password` setzen; `lan_without_login`
+kann dabei `true` bleiben, weil Tunnel-Anfragen an den Cloudflare-Headern erkannt und immer zum Login geführt werden.
+
+## Aktualisieren
+
+Neue Versionen erscheinen im Add-on-Store, sobald `version` in `config.yaml` im Repository erhöht wurde.
+Die Datenbank wird beim Start automatisch migriert.
+
+## Fehlersuche
+
+- **Protokoll** des Add-ons zeigt Start (`StreamGuide <Version> – Daten in /data – Login aktiv …`) und Fehler.
+- `http://homeassistant.local:8765/health` liefert `{"ok": true}`; der Watchdog startet das Add-on sonst neu.
+- Suche/Entdecken liefern Fehler 428 → kein TMDB-Schlüssel hinterlegt.

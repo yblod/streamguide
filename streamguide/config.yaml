@@ -1,0 +1,26 @@
+name: StreamGuide
+version: "1.0.0"
+slug: streamguide
+description: Persönlicher Streaming-Guide und Watch-Tracker für Deutschland (TMDB, IMDb, JustWatch)
+url: https://github.com/yblod/streamguide
+arch:
+  - aarch64
+  - amd64
+startup: services
+boot: auto
+init: false
+ports:
+  8765/tcp: 8765
+ports_description:
+  8765/tcp: Web-Oberfläche im Heimnetz (http://homeassistant.local:8765)
+watchdog: http://[HOST]:[PORT:8765]/health
+options:
+  tmdb_api_key: ""
+  password: ""
+  lan_without_login: true
+  log_level: info
+schema:
+  tmdb_api_key: str?
+  password: password?
+  lan_without_login: bool
+  log_level: list(debug|info|warning|error)?

@@ -1,0 +1,23 @@
+# Geheimnisse und lokale Daten – niemals ins öffentliche Repo
+.env
+*.env
+data/
+data-docker/
+streamguide/data/
+streamguide/.env
+*.db
+*.db-wal
+*.db-shm
+*.zip
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Editor/OS
+.claude/
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

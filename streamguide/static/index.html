@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>StreamGuide</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <div class="bg" aria-hidden="true">
+    <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  </div>
+
+  <header class="topbar glass">
+    <a class="brand" href="#/">
+      <span class="brand-icon">🎬</span><span class="brand-name">StreamGuide</span>
+    </a>
+    <nav class="nav" id="nav">
+      <a href="#/" data-route="home"><span class="ic">🏠</span><span>Start</span></a>
+      <a href="#/discover" data-route="discover"><span class="ic">🧭</span><span>Entdecken</span></a>
+      <a href="#/search" data-route="search"><span class="ic">🔍</span><span>Suche</span></a>
+      <a href="#/watchlist" data-route="watchlist"><span class="ic">🔖</span><span>Watchlist</span></a>
+      <a href="#/series" data-route="series"><span class="ic">📺</span><span>Serien</span></a>
+      <a href="#/people" data-route="people"><span class="ic">🎭</span><span>Schauspieler</span></a>
+      <a href="#/history" data-route="history"><span class="ic">✅</span><span>Gesehen</span></a>
+      <a href="#/settings" data-route="settings"><span class="ic">⚙️</span><span>Einstellungen</span></a>
+    </nav>
+    <div class="topbar-right">
+      <button class="icon-btn" id="theme-toggle" title="Hell/Dunkel">◐</button>
+    </div>
+  </header>
+
+  <main id="app" class="app"></main>
+
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root"></div>
+  <div id="job-root" class="job-root"></div>
+
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

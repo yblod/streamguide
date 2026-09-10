@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 – 2026-09-11
+
+- Oberfläche und Doku ohne persönliche Angaben (Kontonamen, Domain, IP), da das Repository öffentlich ist.
+- Doku: Zugriff im Heimnetz über die IP statt `homeassistant.local`, Hinweise zum Cloudflared-Eintrag.
+
 ## 1.0.0 – 2026-09-10
 
 Erste Add-on-Version von StreamGuide (Abzweig der PC-Version vom 10.09.2026).

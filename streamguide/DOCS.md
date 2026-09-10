@@ -12,8 +12,8 @@ Schauspieler-Favoriten. Datenquellen: TMDB, offizieller IMDb-Bewertungsdatensatz
    (Raspberry Pi 4: einige Minuten).
 4. Unter **Konfiguration** die Optionen setzen (siehe unten) → **Speichern** → **Starten**.
 
-Die App ist danach im Heimnetz unter `http://<IP-des-HA>:8765` erreichbar (z. B. `http://192.168.178.56:8765`
-oder `http://homeassistant.fritz.box:8765`). `homeassistant.local` funktioniert unter Windows oft nicht (mDNS liefert
+Die App ist danach im Heimnetz unter `http://<IP-des-HA>:8765` erreichbar (bei einer Fritzbox auch
+`http://homeassistant.fritz.box:8765`). `homeassistant.local` funktioniert unter Windows oft nicht (mDNS liefert
 nur IPv6-Link-Local). Es gibt bewusst keinen Eintrag in der HA-Seitenleiste (kein Ingress).
 
 ## Optionen
@@ -53,11 +53,13 @@ Add-on-Infoseite unter **Hostname** und hat die Form `<hash>-streamguide`.
 Im Cloudflared-Add-on unter **Zusätzliche Hosts** (`additional_hosts`) ergänzen:
 
 ```yaml
-- hostname: stream.yblod.de
+- hostname: stream.example.de
   service: http://<hash>-streamguide:8765
 ```
 
-Cloudflared legt den DNS-Eintrag (CNAME) selbst an. Vorher unbedingt `password` setzen; `lan_without_login`
+Cloudflared legt den DNS-Eintrag (CNAME) selbst an. Am besten in der YAML-Ansicht der Konfiguration eintragen
+und das Add-on danach über die lokale HA-Adresse neu starten (ein Neustart über den Tunnel trennt die eigene
+Verbindung und meldet fälschlich einen Fehler). Vorher unbedingt `password` setzen; `lan_without_login`
 kann dabei `true` bleiben, weil Tunnel-Anfragen an den Cloudflare-Headern erkannt und immer zum Login geführt werden.
 
 ## Aktualisieren

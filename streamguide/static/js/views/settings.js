@@ -15,7 +15,7 @@ export async function render(root, params) {
   const keyInput = h('input', { type: 'password', placeholder: st.has_key ? `Hinterlegt (${st.key_masked}) – zum Ändern neu eingeben` : 'API Key (v3) oder Read Access Token (v4)', style: { width: '100%' } });
   const keyPanel = h('div', { class: 'glass panel' },
     h('h2', {}, '🔑 TMDB-API-Schlüssel'),
-    h('p', { class: 'muted small' }, 'Kostenlos unter ', h('a', { href: 'https://www.themoviedb.org/settings/api', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'themoviedb.org → Einstellungen → API'), ' (in deinem Konto „gogoweb“). Der Schlüssel bleibt lokal in der Datenbank.'),
+    h('p', { class: 'muted small' }, 'Kostenlos unter ', h('a', { href: 'https://www.themoviedb.org/settings/api', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'themoviedb.org → Einstellungen → API'), ' (in deinem TMDB-Konto). Der Schlüssel bleibt lokal in der Datenbank.'),
     h('div', { class: 'row', style: { marginTop: '10px' } }, h('div', { class: 'grow' }, keyInput),
       h('button', { class: 'btn primary', onClick: async () => {
         const key = keyInput.value.trim();
@@ -71,7 +71,7 @@ export async function render(root, params) {
   drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); upload(e.dataTransfer.files[0]); });
   fileInput.addEventListener('change', () => { upload(fileInput.files[0]); fileInput.value = ''; });
   const imdbPanel = h('div', { class: 'glass panel' },
-    h('h2', {}, '🎞 IMDb-Import (Konto gogo-27)'),
+    h('h2', {}, '🎞 IMDb-Import'),
     h('p', { class: 'muted small' }, 'IMDb bietet keinen API-Zugriff auf dein Konto, aber einen CSV-Export: ',
       h('a', { href: 'https://www.imdb.com/list/ratings/', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'Deine Bewertungen'), ' bzw. ',
       h('a', { href: 'https://www.imdb.com/list/watchlist/', target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'Watchlist'),
@@ -105,7 +105,7 @@ export async function render(root, params) {
 
   // ---------- TMDB-Konto ----------
   const tmdbPanel = h('div', { class: 'glass panel' },
-    h('h2', {}, '🎬 TMDB-Konto (gogoweb)'),
+    h('h2', {}, '🎬 TMDB-Konto'),
     st.tmdb_connected
       ? [h('p', { class: 'small', style: { color: 'var(--ok)' } }, `✓ Verbunden als ${st.tmdb_username || 'TMDB-Nutzer'}`),
         h('div', { class: 'row' },

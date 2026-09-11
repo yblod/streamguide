@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 – 2026-09-11
+
+- Neu: **Weitere Länder (per VPN)** in den Einstellungen, z. B. Großbritannien für BBC iPlayer. Angebote der gewählten
+  Länder werden zusätzlich zu Deutschland geladen; dort aktiv geschaltete Anbieter zählen als „meine Anbieter“
+  (Startseite, Watchlist-Verfügbarkeit, Entdecken). Inaktive Auslandsangebote werden ignoriert.
+  Beim Hinzufügen von Großbritannien sind BBC iPlayer, ITVX und Channel 4 vorbelegt.
+- Auslandsangebote sind auf Karten und in der Detailansicht mit Flagge gekennzeichnet.
+- Datenbank: Anbieter werden je Land gespeichert (automatische Migration, Sicherungen älterer Versionen lassen sich
+  weiterhin einspielen).
+
 ## 1.0.5 – 2026-09-11
 
 - Frontend-Dateien werden unter einem versionierten Pfad (`/static/v<Version>/…`) eingebunden. Safari auf dem iPad

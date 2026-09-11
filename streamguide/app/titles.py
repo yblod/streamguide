@@ -1,4 +1,4 @@
-"""Titel-Cache: TMDB-Details, Streaming-Angebote (DE), IMDb-Bewertung, Zugangsmodell."""
+"""Titel-Cache: TMDB-Details, Streaming-Angebote (DE + Zusatzländer per VPN), IMDb-Bewertung, Zugangsmodell."""
 from __future__ import annotations
 
 import asyncio
@@ -100,7 +100,7 @@ def full_from_details(media_type: str, d: dict[str, Any]) -> dict[str, Any]:
     else:
         rt = d.get("episode_run_time") or []
         runtime = rt[0] if rt else ((d.get("last_episode_to_air") or {}).get("runtime"))
-    prov = ((d.get("watch/providers") or {}).get("results") or {}).get(tmdb.REGION) or {}
+    prov = (d.get("watch/providers") or {}).get("results") or {}
     origin = d.get("origin_country") or [c.get("iso_3166_1") for c in d.get("production_countries", [])]
     nxt = d.get("next_episode_to_air") or {}
     last_ep = d.get("last_episode_to_air") or {}
@@ -132,13 +132,26 @@ def full_from_details(media_type: str, d: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
-def clean_providers(prov: dict[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {"link": prov.get("link")}
+def clean_providers(results: dict[str, Any]) -> dict[str, Any]:
+    """TMDB-Angebote je Land (`results`) auf das gespeicherte Format eindampfen.
+
+    DE-Angebote bilden die Basis (ohne `region`, wie bisher); Angebote der gewählten Zusatzländer werden mit
+    `region` (z. B. "GB") an dieselben Listen angehängt. Ob sie zählen, entscheidet später `availability()`."""
+    de = results.get(tmdb.REGION) or {}
+    out: dict[str, Any] = {"link": de.get("link")}
     for t in OFFER_TYPES:
         out[t] = [
             {"id": p["provider_id"], "name": p.get("provider_name"), "logo": p.get("logo_path")}
-            for p in prov.get(t, [])
+            for p in de.get(t, [])
         ]
+    for region in tmdb.extra_regions():
+        rp = results.get(region) or {}
+        for t in OFFER_TYPES:
+            out[t].extend(
+                {"id": p["provider_id"], "name": p.get("provider_name"), "logo": p.get("logo_path"),
+                 "region": region, "link": rp.get("link")}
+                for p in rp.get(t, [])
+            )
     return out
 
 
@@ -221,8 +234,13 @@ async def ensure_many(keys: Iterable[tuple[str, int]], force: bool = False,
 
 # ---------- Anreicherung für die API-Ausgabe ----------
 
-def active_provider_ids() -> set[int]:
-    return {r["id"] for r in db.query("SELECT id FROM providers WHERE active=1")}
+def active_providers() -> set[tuple[int, str]]:
+    """Aktive Anbieter als (TMDB-Anbieter-ID, Land)."""
+    return {(r["id"], r["region"]) for r in db.query("SELECT id, region FROM providers WHERE active=1")}
+
+
+def _region(p: dict[str, Any]) -> str:
+    return p.get("region") or tmdb.REGION
 
 
 def genre_map() -> dict[str, dict[int, str]]:
@@ -245,10 +263,10 @@ def _family(name: str | None) -> str:
 
 def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Varianten desselben Anbieters (Netflix / Netflix mit Werbung) nur einmal anzeigen."""
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
     out = []
     for p in items:
-        fam = _family(p.get("name"))
+        fam = (_family(p.get("name")), _region(p))
         if fam in seen:
             continue
         seen.add(fam)
@@ -262,6 +280,9 @@ def _attach_audio(items: list[dict[str, Any]], jw: dict[str, Any] | None, kinds:
         return items
     out = []
     for p in items:
+        if _region(p) != tmdb.REGION:
+            out.append(p)  # JustWatch-Sprachdaten gelten nur für DE-Angebote
+            continue
         fam = _family(p.get("name"))
         audio: set[str] = set()
         subs: set[str] = set()
@@ -282,17 +303,31 @@ def _attach_audio(items: list[dict[str, Any]], jw: dict[str, Any] | None, kinds:
     return out
 
 
-def availability(providers: dict[str, Any] | None, active: set[int], count_all_free: bool,
+def availability(providers: dict[str, Any] | None, active: set[tuple[int, str]], count_all_free: bool,
                  jw: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Zugangsmodell aus Sicht des Nutzers berechnen (inkl. Wiedergabesprachen aus JustWatch, falls vorhanden)."""
+    """Zugangsmodell aus Sicht des Nutzers berechnen (inkl. Wiedergabesprachen aus JustWatch, falls vorhanden).
+
+    Angebote aus Zusatzländern (VPN) zählen nur, wenn der Anbieter dort aktiv ist; inaktive Auslandsangebote
+    werden komplett ignoriert (weder Leihen/Kaufen noch „anderes Abo“)."""
     prov = providers or {}
-    sub = _dedupe([p for p in prov.get("flatrate", []) if p["id"] in active])
-    free_all = prov.get("free", []) + prov.get("ads", [])
-    free = _dedupe([p for p in free_all if count_all_free or p["id"] in active])
-    rent = _dedupe(prov.get("rent", []))
-    buy = _dedupe(prov.get("buy", []))
-    other_sub = _dedupe([p for p in prov.get("flatrate", []) if p["id"] not in active])
-    other_free = _dedupe([p for p in free_all if not (count_all_free or p["id"] in active)])
+
+    def is_active(p: dict[str, Any]) -> bool:
+        return (p["id"], _region(p)) in active
+
+    def is_de(p: dict[str, Any]) -> bool:
+        return _region(p) == tmdb.REGION
+
+    def visible(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return [p for p in items if is_de(p) or is_active(p)]
+
+    flat = visible(prov.get("flatrate", []))
+    free_all = visible(prov.get("free", []) + prov.get("ads", []))
+    sub = _dedupe([p for p in flat if is_active(p)])
+    free = _dedupe([p for p in free_all if is_active(p) or (count_all_free and is_de(p))])
+    rent = _dedupe(visible(prov.get("rent", [])))
+    buy = _dedupe(visible(prov.get("buy", [])))
+    other_sub = _dedupe([p for p in flat if not is_active(p)])
+    other_free = _dedupe([p for p in free_all if not (is_active(p) or (count_all_free and is_de(p)))])
     if sub:
         mode = "sub"
     elif free:
@@ -340,7 +375,7 @@ def decorate(rows: list[dict[str, Any]], user_map: dict[tuple[str, int], dict[st
     """Titelzeilen aus der DB in API-Objekte verwandeln (IMDb-Rating, Genres, Verfügbarkeit, Nutzerstatus)."""
     if not rows:
         return []
-    active = active_provider_ids()
+    active = active_providers()
     count_all_free = bool(db.get_setting("count_all_free", False))
     gmap = genre_map()
     imdb_ids = [r["imdb_id"] for r in rows if r.get("imdb_id")]

@@ -19,7 +19,8 @@ from .version import VERSION
 
 router = APIRouter(prefix="/api")
 
-SETTING_KEYS = ("tmdb_api_key", "count_all_free", "dislike_threshold", "tmdb_mirror_watchlist", "tmdb_mirror_ratings", "theme")
+SETTING_KEYS = ("tmdb_api_key", "count_all_free", "dislike_threshold", "tmdb_mirror_watchlist", "tmdb_mirror_ratings", "theme",
+                "extra_regions")
 
 
 def _err(e: Exception) -> HTTPException:
@@ -52,6 +53,8 @@ async def status(request: Request | None = None) -> dict[str, Any]:
         "has_key": bool(key),
         "key_masked": (key[:4] + "…" + key[-4:]) if len(key) > 10 else ("•" * len(key)),
         "providers_seeded": bool(db.query_one("SELECT 1 FROM providers LIMIT 1")),
+        "extra_regions": tmdb.extra_regions(),
+        "regions_available": list(tmdb.EXTRA_REGIONS),
         "tmdb_connected": bool(s.get("tmdb_session_id")),
         "tmdb_username": s.get("tmdb_username"),
         "settings": {k: s.get(k) for k in SETTING_KEYS if k != "tmdb_api_key"},
@@ -67,6 +70,7 @@ class SettingsIn(BaseModel):
     tmdb_mirror_watchlist: bool | None = None
     tmdb_mirror_ratings: bool | None = None
     theme: str | None = None
+    extra_regions: list[str] | None = None
 
 
 @router.put("/settings")
@@ -87,6 +91,22 @@ async def put_settings(body: SettingsIn) -> dict[str, Any]:
         v = getattr(body, k)
         if v is not None:
             db.set_setting(k, v)
+    if body.extra_regions is not None:
+        wanted = [r for r in tmdb.EXTRA_REGIONS if r in {str(x).upper() for x in body.extra_regions}]
+        if wanted != tmdb.extra_regions():
+            db.set_setting("extra_regions", wanted)
+            if tmdb.api_key():
+                try:
+                    await sync.seed_providers()  # neue Länder laden, abgewählte entfernen
+                except tmdb.TMDBError as e:
+                    raise _err(e)
+                # Gespeicherte Angebote passen nicht mehr zur Länderauswahl: bei nächster Nutzung neu laden,
+                # Bibliothek sofort im Hintergrund auffrischen.
+                db.execute("UPDATE titles SET providers_fetched_at=NULL")
+                try:
+                    jobs.start("refresh_library", lambda j: sync.refresh_library(j))
+                except RuntimeError:
+                    pass
     return await status()
 
 
@@ -96,20 +116,34 @@ async def get_providers(all: bool = False) -> list[dict[str, Any]]:
         await sync.seed_providers()
     except tmdb.TMDBError as e:
         raise _err(e)
+    order = {r: i for i, r in enumerate(tmdb.regions())}
     rows = db.query("SELECT * FROM providers ORDER BY active DESC, display_priority ASC, name ASC")
+    rows.sort(key=lambda r: (not r["active"], order.get(r["region"], 99)))  # stabil: DE vor Zusatzländern
     for r in rows:
         r["active"] = bool(r["active"])
         r["media_types"] = db.loads(r["media_types"], [])
-    return rows if all else rows[:120]
+    if all:
+        return rows
+    # Begrenzung je Land, damit die Liste bei mehreren Ländern nicht explodiert
+    per_region: dict[str, int] = {}
+    out = []
+    for r in rows:
+        n = per_region.get(r["region"], 0)
+        if n < 120:
+            out.append(r)
+            per_region[r["region"]] = n + 1
+    return out
 
 
 class ProviderToggle(BaseModel):
     active: bool
+    region: str = tmdb.REGION
 
 
 @router.put("/providers/{provider_id}")
 async def toggle_provider(provider_id: int, body: ProviderToggle) -> dict[str, Any]:
-    db.execute("UPDATE providers SET active=? WHERE id=?", (1 if body.active else 0, provider_id))
+    db.execute("UPDATE providers SET active=? WHERE id=? AND region=?",
+               (1 if body.active else 0, provider_id, body.region.upper()))
     sync.check_new_seasons()
     return {"ok": True}
 

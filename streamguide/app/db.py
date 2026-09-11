@@ -24,12 +24,14 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 CREATE TABLE IF NOT EXISTS providers (
-    id               INTEGER PRIMARY KEY,
+    id               INTEGER NOT NULL,
+    region           TEXT NOT NULL DEFAULT 'DE',   -- Land des Angebots (DE oder ein VPN-Zusatzland wie GB)
     name             TEXT NOT NULL,
     logo_path        TEXT,
     display_priority INTEGER DEFAULT 999,
     active           INTEGER DEFAULT 0,
-    media_types      TEXT DEFAULT '[]'
+    media_types      TEXT DEFAULT '[]',
+    PRIMARY KEY (id, region)
 );
 
 CREATE TABLE IF NOT EXISTS genres (
@@ -194,6 +196,25 @@ def _migrate(conn: sqlite3.Connection) -> None:
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
         if col not in cols:
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
+    _migrate_providers_region(conn)
+
+
+def _migrate_providers_region(conn: sqlite3.Connection) -> None:
+    """providers: Primärschlüssel (id) -> (id, region), bestehende Zeilen gelten als DE."""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(providers)").fetchall()}
+    if "region" in cols:
+        return
+    conn.executescript("""
+        CREATE TABLE providers_new (
+            id INTEGER NOT NULL, region TEXT NOT NULL DEFAULT 'DE', name TEXT NOT NULL, logo_path TEXT,
+            display_priority INTEGER DEFAULT 999, active INTEGER DEFAULT 0, media_types TEXT DEFAULT '[]',
+            PRIMARY KEY (id, region)
+        );
+        INSERT INTO providers_new(id, region, name, logo_path, display_priority, active, media_types)
+            SELECT id, 'DE', name, logo_path, display_priority, active, media_types FROM providers;
+        DROP TABLE providers;
+        ALTER TABLE providers_new RENAME TO providers;
+    """)
 
 
 @contextmanager

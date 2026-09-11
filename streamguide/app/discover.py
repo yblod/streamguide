@@ -14,8 +14,22 @@ PAGE_SIZE = 20
 ADULT_KEYWORDS = (256466, 325693, 155477, 207767, 302868, 298666, 10053, 314184, 337325, 226010, 207807)
 
 
-def _active_sub_ids() -> list[int]:
-    return [r["id"] for r in db.query("SELECT id FROM providers WHERE active=1 ORDER BY display_priority")]
+def _active_sub_ids(region: str = tmdb.REGION) -> list[int]:
+    return [r["id"] for r in db.query("SELECT id FROM providers WHERE active=1 AND region=? ORDER BY display_priority",
+                                      (region,))]
+
+
+def extra_region_params(media_type: str, f: dict[str, Any]) -> list[dict[str, Any]]:
+    """Zusätzliche Discover-Abfragen für Zusatzländer (VPN) mit dort aktiven Anbietern, nur bei „meine Anbieter“."""
+    if (f.get("availability") or "mine") != "mine":
+        return []
+    out = []
+    for region in tmdb.extra_regions():
+        ids = _active_sub_ids(region)
+        if ids:
+            out.append({**build_params(media_type, f), "watch_region": region,
+                        "with_watch_providers": "|".join(str(i) for i in ids)})
+    return out
 
 
 def build_params(media_type: str, f: dict[str, Any]) -> dict[str, Any]:
@@ -130,11 +144,15 @@ async def run(f: dict[str, Any]) -> dict[str, Any]:
         batch: list[tuple[str, dict[str, Any]]] = []
         more = False
         for mt in media_types:
-            data = await tmdb.discover(mt, {**build_params(mt, f), "page": p})
-            for r in data.get("results", []):
-                batch.append((mt, r))
-            if p < int(data.get("total_pages") or 0):
-                more = True
+            seen: set[int] = set()
+            for params in (build_params(mt, f), *extra_region_params(mt, f)):
+                data = await tmdb.discover(mt, {**params, "page": p})
+                for r in data.get("results", []):
+                    if r["id"] not in seen:
+                        seen.add(r["id"])
+                        batch.append((mt, r))
+                if p < int(data.get("total_pages") or 0):
+                    more = True
         for mt, r in batch:
             titles.upsert_lite(mt, r)
         keys = [(mt, r["id"]) for mt, r in batch]

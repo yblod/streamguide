@@ -12,6 +12,18 @@ from . import db
 BASE = "https://api.themoviedb.org/3"
 REGION = "DE"
 LANG = "de-DE"
+# Zusätzliche Länder, deren Angebote (per VPN) mitgezählt werden dürfen; Auswahl in den Einstellungen.
+EXTRA_REGIONS = ("GB", "US", "AT", "CH", "FR", "IT", "ES", "NL", "SE", "DK")
+
+
+def extra_regions() -> list[str]:
+    """In den Einstellungen gewählte Zusatzländer (ohne DE), nur erlaubte Kürzel."""
+    raw = db.get_setting("extra_regions", []) or []
+    return [r for r in EXTRA_REGIONS if r in {str(x).upper() for x in raw}]
+
+
+def regions() -> list[str]:
+    return [REGION, *extra_regions()]
 
 _client: httpx.AsyncClient | None = None
 _sem = asyncio.Semaphore(16)
@@ -109,8 +121,8 @@ async def genres(media_type: str) -> list[dict[str, Any]]:
     return data.get("genres", []) if data else []
 
 
-async def watch_providers(media_type: str) -> list[dict[str, Any]]:
-    data = await get(f"/watch/providers/{media_type}", watch_region=REGION, language=LANG)
+async def watch_providers(media_type: str, region: str = REGION) -> list[dict[str, Any]]:
+    data = await get(f"/watch/providers/{media_type}", watch_region=region, language=LANG)
     return data.get("results", []) if data else []
 
 
@@ -120,10 +132,11 @@ async def details(media_type: str, tmdb_id: int) -> dict[str, Any] | None:
 
 
 async def providers_only(media_type: str, tmdb_id: int) -> dict[str, Any] | None:
+    """Angebote je Land (TMDB-`results`, Schlüssel = Länderkürzel); None bei Fehler."""
     data = await get(f"/{media_type}/{tmdb_id}/watch/providers")
     if not data:
         return None
-    return (data.get("results") or {}).get(REGION) or {}
+    return data.get("results") or {}
 
 
 async def find_by_imdb(imdb_id: str) -> dict[str, Any] | None:

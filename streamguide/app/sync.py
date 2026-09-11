@@ -13,40 +13,60 @@ from .jobs import Job
 DEFAULT_ACTIVE_NAMES = ("netflix", "amazon prime video", "ard", "zdf", "arte", "3sat")
 DEFAULT_ACTIVE_IDS = {350}  # Apple TV+ (Abo, nicht der Kauf-/Leih-Store "Apple TV")
 DEFAULT_EXCLUDE = ("channel", "plus", "kids", "herzkino")  # kostenpflichtige Zusatzkanäle nicht vorbelegen
+# Vorbelegung in Zusatzländern (VPN): nur die frei empfangbaren Sender-Mediatheken, ohne Bezahlstufen
+DEFAULT_ACTIVE_EXTRA = {"GB": ("bbc iplayer", "itvx", "channel 4"), "AT": ("orf",), "CH": ("srf", "play suisse")}
+DEFAULT_EXCLUDE_EXTRA = ("plus", "premium", "kids")
 
 
 # ---------- Stammdaten ----------
 
 async def seed_providers(force: bool = False) -> int:
-    existing = {r["id"]: r for r in db.query("SELECT * FROM providers")}
-    if existing and not force:
+    """Anbieterliste für DE und die gewählten Zusatzländer von TMDB laden.
+    Ohne force werden nur Länder nachgeladen, die noch keine Zeilen haben; Länder, die nicht mehr gewählt sind,
+    werden entfernt."""
+    regions = tmdb.regions()
+    existing: dict[tuple[int, str], dict[str, Any]] = {(r["id"], r["region"]): r for r in db.query("SELECT * FROM providers")}
+    present = {k[1] for k in existing}
+    gone = present - set(regions)
+    if gone:
+        db.execute(f"DELETE FROM providers WHERE region IN ({','.join('?' * len(gone))})", tuple(gone))
+        existing = {k: r for k, r in existing.items() if k[1] not in gone}
+        present -= gone
+    todo = regions if force else [r for r in regions if r not in present]
+    if not todo:
         return len(existing)
-    movie = await tmdb.watch_providers("movie")
-    tv = await tmdb.watch_providers("tv")
-    merged: dict[int, dict[str, Any]] = {}
-    for kind, lst in (("movie", movie), ("tv", tv)):
-        for p in lst:
-            pid = p["provider_id"]
-            m = merged.setdefault(pid, {
-                "id": pid, "name": p["provider_name"], "logo_path": p.get("logo_path"),
-                "display_priority": (p.get("display_priorities") or {}).get("DE", p.get("display_priority", 999)),
-                "media_types": set(),
-            })
-            m["media_types"].add(kind)
     rows = []
-    for pid, m in merged.items():
-        if pid in existing:
-            active = existing[pid]["active"]
-        else:
-            name = m["name"].lower()
-            active = 1 if (pid in DEFAULT_ACTIVE_IDS or (any(name.startswith(n) for n in DEFAULT_ACTIVE_NAMES)
-                                                       and not any(x in name for x in DEFAULT_EXCLUDE))) else 0
-        rows.append((pid, m["name"], m["logo_path"], m["display_priority"], active, json.dumps(sorted(m["media_types"]))))
+    for region in todo:
+        movie = await tmdb.watch_providers("movie", region)
+        tv = await tmdb.watch_providers("tv", region)
+        merged: dict[int, dict[str, Any]] = {}
+        for kind, lst in (("movie", movie), ("tv", tv)):
+            for p in lst:
+                pid = p["provider_id"]
+                m = merged.setdefault(pid, {
+                    "id": pid, "name": p["provider_name"], "logo_path": p.get("logo_path"),
+                    "display_priority": (p.get("display_priorities") or {}).get(region, p.get("display_priority", 999)),
+                    "media_types": set(),
+                })
+                m["media_types"].add(kind)
+        for pid, m in merged.items():
+            if (pid, region) in existing:
+                active = existing[(pid, region)]["active"]
+            else:
+                name = m["name"].lower()
+                if region == tmdb.REGION:
+                    active = 1 if (pid in DEFAULT_ACTIVE_IDS or (any(name.startswith(n) for n in DEFAULT_ACTIVE_NAMES)
+                                                               and not any(x in name for x in DEFAULT_EXCLUDE))) else 0
+                else:
+                    active = 1 if (any(name.startswith(n) for n in DEFAULT_ACTIVE_EXTRA.get(region, ()))
+                                   and not any(x in name for x in DEFAULT_EXCLUDE_EXTRA)) else 0
+            rows.append((pid, region, m["name"], m["logo_path"], m["display_priority"], active,
+                         json.dumps(sorted(m["media_types"]))))
     db.executemany(
-        "INSERT INTO providers(id,name,logo_path,display_priority,active,media_types) VALUES(?,?,?,?,?,?) "
-        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, logo_path=excluded.logo_path, "
+        "INSERT INTO providers(id,region,name,logo_path,display_priority,active,media_types) VALUES(?,?,?,?,?,?,?) "
+        "ON CONFLICT(id,region) DO UPDATE SET name=excluded.name, logo_path=excluded.logo_path, "
         "display_priority=excluded.display_priority, media_types=excluded.media_types", rows)
-    return len(rows)
+    return len(db.query("SELECT id FROM providers"))
 
 
 async def seed_genres(force: bool = False) -> None:

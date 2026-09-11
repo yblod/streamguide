@@ -213,6 +213,15 @@ label.field > * { color: var(--text); font-weight: 500; }
 .prov { width: 24px; height: 24px; border-radius: 7px; overflow: hidden; border: 2px solid rgba(255,255,255,0.9); background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.3); margin-left: -6px; }
 .prov img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .prov.dim { opacity: 0.55; filter: grayscale(1); }
+/* Angebot aus einem Zusatzland (VPN): Länderkürzel-Badge am Logo bzw. inline hinter dem Namen */
+.flag { display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; line-height: 1; padding: 2px 4px; border-radius: 5px; background: var(--accent); color: #fff; font-family: inherit; }
+.flag.inline { margin-left: 6px; vertical-align: 2px; }
+.flag.big { font-size: 0.75rem; padding: 3px 6px; margin-left: 0; margin-right: 2px; }
+.prov.abroad { position: relative; overflow: visible; }
+.prov.abroad img { border-radius: 5px; }
+.prov .flag { position: absolute; right: -8px; bottom: -8px; box-shadow: 0 1px 4px rgba(0,0,0,0.4); border: 1.5px solid #fff; }
+.prov-item.on .flag { background: rgba(255,255,255,0.28); }
+.offer .flag.inline { vertical-align: 1px; }
 .card .overlay .t { padding-right: 0; }
 .card.has-provs .overlay { padding-right: 60px; }
 .card .mode-dot { position: absolute; bottom: 13px; left: 10px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255,255,255,0.8); }

@@ -33,6 +33,14 @@ Alles liegt in `/data` des Add-ons (SQLite-Datenbank `streamguide.db`, Sicherung
 damit Teil der Home-Assistant-Backups. Beim ersten Start lädt die App den IMDb-Bewertungsdatensatz (~7 MB,
 1,7 Mio. Zeilen); das dauert auf dem Pi einige Minuten und läuft im Hintergrund.
 
+### Weitere Länder (per VPN)
+
+Wer per VPN auch ausländische Mediatheken nutzt (z. B. BBC iPlayer in Großbritannien), wählt in den Einstellungen
+unter „Weitere Länder“ das Land aus. Die App lädt dann die Anbieter und Angebote dieses Landes zusätzlich zu
+Deutschland. Nur Anbieter, die dort aktiv geschaltet werden, zählen als „meine Anbieter“; alle übrigen
+Auslandsangebote werden ignoriert. Solche Angebote erscheinen auf Karten und in der Detailansicht mit Flagge.
+Nach dem Hinzufügen eines Landes werden die Angebote der Bibliothek im Hintergrund neu geladen.
+
 ### Daten von der PC-Version übernehmen
 
 1. Auf dem PC in `F:\Claude\streamguide-ha`:

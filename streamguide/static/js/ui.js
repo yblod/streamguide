@@ -31,6 +31,18 @@ export function toast(msg, kind = '') {
 export const STATUS_LABEL = { watchlist: '🔖 Watchlist', watching: '📺 Verfolgen', watched: '✓ Gesehen', disliked: '✕ Kein Interesse', dropped: '⏸ Abgebrochen' };
 export const MODE_LABEL = { sub: 'Im Abo', free: 'Kostenlos', other_sub: 'Anderes Abo', rent: 'Leihen/Kaufen', none: 'Nicht verfügbar' };
 
+// Zusatzländer (Angebote per VPN). Kennzeichnung über ein Kürzel-Badge statt Flaggen-Emoji, weil Windows keine
+// Flaggen darstellt (dort erschienen nur die Buchstaben).
+export const REGION_NAME = {
+  DE: 'Deutschland', GB: 'Großbritannien', US: 'USA', AT: 'Österreich', CH: 'Schweiz', FR: 'Frankreich',
+  IT: 'Italien', ES: 'Spanien', NL: 'Niederlande', SE: 'Schweden', DK: 'Dänemark',
+};
+export const regionName = (r) => REGION_NAME[r] || r;
+export const regionBadge = (r, cls = '') => h('span', { class: `flag ${cls}`, title: `${regionName(r)} – per VPN` }, r);
+// Anbieter-Logo mit Länder-Badge, wenn das Angebot aus einem Zusatzland (VPN) stammt
+export const provLogo = (p, cls = '', titleSuffix = '') => h('span', { class: `prov ${cls} ${p.region ? 'abroad' : ''}`, title: `${p.name}${p.region ? ` (${regionName(p.region)}, per VPN)` : ''}${titleSuffix}` },
+  h('img', { src: IMG(p.logo, 'w92'), alt: p.name }), p.region ? regionBadge(p.region) : null);
+
 // ---------- Karte ----------
 export function card(t, opts = {}) {
   const av = t.availability || {};
@@ -54,8 +66,8 @@ export function card(t, opts = {}) {
         : h('button', { class: `q ${u.status === 'watchlist' ? 'on' : ''}`, title: u.status === 'watchlist' ? 'Von der Watchlist entfernen' : 'Auf die Watchlist', onClick: (e) => { e.stopPropagation(); quick(t, u.status === 'watchlist' ? null : 'watchlist', opts); } }, '🔖'),
       h('button', { class: `q danger ${u.status === 'disliked' ? 'on' : ''}`, title: u.status === 'disliked' ? 'Kein Interesse zurücknehmen' : 'Kein Interesse', onClick: (e) => { e.stopPropagation(); quick(t, u.status === 'disliked' ? null : 'disliked', opts); } }, '✕')),
     (provs.length || dim.length) ? h('div', { class: 'provs' },
-      ...provs.map((p) => h('span', { class: 'prov', title: p.name }, h('img', { src: IMG(p.logo, 'w92'), alt: p.name }))),
-      ...dim.map((p) => h('span', { class: 'prov dim', title: `${p.name} (nicht aktiv)` }, h('img', { src: IMG(p.logo, 'w92'), alt: p.name })))) : null,
+      ...provs.map((p) => provLogo(p)),
+      ...dim.map((p) => provLogo(p, 'dim', ' – nicht aktiv'))) : null,
   );
   return el;
 }
@@ -93,7 +105,7 @@ export function section(title, content, extra) {
 
 export function providerLogos(list, cls = '') {
   return h('span', { class: `provs ${cls}`, style: { position: 'static', display: 'inline-flex' } },
-    ...list.map((p) => h('span', { class: 'prov', title: p.name }, h('img', { src: IMG(p.logo, 'w92'), alt: p.name }))));
+    ...list.map((p) => provLogo(p)));
 }
 
 export function fmtRuntime(min) {
@@ -224,8 +236,8 @@ function renderModal(t) {
   if (modal.parentElement) modal.parentElement.scrollTop = 0;
 
   const offers = [];
-  const offerGroup = (list, kind, mine) => list.forEach((p) => offers.push(h('div', { class: `offer ${mine ? 'mine' : ''}`, title: p.audio && p.audio.length ? `Ton: ${p.audio.map(LANG_LABEL).join(', ')}${p.subs?.length ? ' · Untertitel: ' + p.subs.map(LANG_LABEL).join(', ') : ''}` : `${p.name} (keine Sprachdaten)` },
-    h('img', { src: IMG(p.logo, 'w92'), alt: '' }), h('span', {}, p.name, h('div', { class: 'kind' }, kind),
+  const offerGroup = (list, kind, mine) => list.forEach((p) => offers.push(h('div', { class: `offer ${mine ? 'mine' : ''}`, title: p.region ? `${p.name} in ${regionName(p.region)} – nur per VPN erreichbar` : p.audio && p.audio.length ? `Ton: ${p.audio.map(LANG_LABEL).join(', ')}${p.subs?.length ? ' · Untertitel: ' + p.subs.map(LANG_LABEL).join(', ') : ''}` : `${p.name} (keine Sprachdaten)` },
+    h('img', { src: IMG(p.logo, 'w92'), alt: '' }), h('span', {}, p.name, p.region ? regionBadge(p.region, 'inline') : null, h('div', { class: 'kind' }, p.region ? `${kind} · ${regionName(p.region)} (VPN)` : kind),
       p.audio && p.audio.length ? h('div', { class: 'audio' }, '🔊 ' + p.audio.map(LANG_LABEL).join(' ')) : null))));
   offerGroup(av.sub || [], 'Im Abo ✓', true);
   offerGroup(av.free || [], 'Kostenlos ✓', true);
@@ -277,8 +289,8 @@ function renderModal(t) {
         ),
         h('div', { class: 'section-title' }, 'Meine Bewertung', u.rated_at ? h('span', { class: 'muted', style: { textTransform: 'none', letterSpacing: 0, fontWeight: 500 } }, ` · ${fmtDate(u.rated_at)}`) : null),
         stars,
-        h('div', { class: 'section-title' }, `Wo streamen? (DE) · ${MODE_LABEL[av.mode] || 'unbekannt'}`),
-        offers.length ? h('div', { class: 'offers' }, ...offers) : h('p', { class: 'muted small' }, 'Aktuell kein Streaming-Angebot in Deutschland bekannt.'),
+        h('div', { class: 'section-title' }, `Wo streamen? · ${MODE_LABEL[av.mode] || 'unbekannt'}`),
+        offers.length ? h('div', { class: 'offers' }, ...offers) : h('p', { class: 'muted small' }, 'Aktuell kein Streaming-Angebot in Deutschland (oder deinen VPN-Ländern) bekannt.'),
         av.link ? h('p', { class: 'small' }, h('a', { href: av.jw_path ? `https://www.justwatch.com${av.jw_path}` : av.link, target: '_blank', rel: 'noopener', style: { color: 'var(--accent)' } }, 'Angebote auf JustWatch ansehen ↗'),
           av.jw ? h('span', { class: 'muted' }, ' · Wiedergabesprachen laut JustWatch') : h('span', { class: 'muted' }, ' · keine Sprachdaten bei JustWatch')) : null,
         t.overview ? [h('div', { class: 'section-title' }, 'Handlung'), h('p', { class: 'overview' }, t.overview)] : null,

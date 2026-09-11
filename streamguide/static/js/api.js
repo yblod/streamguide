@@ -34,7 +34,7 @@ export const api = {
   status: () => req('GET', '/status'),
   settings: (b) => req('PUT', '/settings', b),
   providers: () => req('GET', '/providers'),
-  toggleProvider: (id, active) => req('PUT', `/providers/${id}`, { active }),
+  toggleProvider: (id, active, region = 'DE') => req('PUT', `/providers/${id}`, { active, region }),
   genres: () => req('GET', '/genres'),
   home: () => req('GET', '/home'),
   search: (q, page = 1) => req('GET', `/search?q=${encodeURIComponent(q)}&page=${page}`),

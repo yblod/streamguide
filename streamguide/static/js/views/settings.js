@@ -1,6 +1,6 @@
 // Einstellungen: TMDB-Schlüssel, aktive Abos, Importe (IMDb-CSV, TMDB-Konto, Titelliste), Wartung.
 import { api, IMG } from '../api.js';
-import { h, toast, fmtDate } from '../ui.js';
+import { h, toast, fmtDate, regionBadge, regionName } from '../ui.js';
 import { watchJobs } from '../app.js';
 
 export async function render(root, params) {
@@ -36,13 +36,34 @@ export async function render(root, params) {
     const list = providers.filter((p) => p.active || (q && p.name.toLowerCase().includes(q)));
     if (!list.length) provList.append(h('span', { class: 'muted small' }, q ? 'Kein Anbieter gefunden.' : 'Keine aktiven Anbieter.'));
     for (const p of list) {
-      provList.append(h('div', { class: `prov-item ${p.active ? 'on' : 'off'}`, onClick: async () => {
-        try { await api.toggleProvider(p.id, !p.active); p.active = !p.active; drawProviders(); toast(`${p.name} ${p.active ? 'aktiviert' : 'deaktiviert'}`, 'ok'); }
+      const abroad = p.region && p.region !== 'DE';
+      provList.append(h('div', { class: `prov-item ${p.active ? 'on' : 'off'}`, title: abroad ? `${p.name} in ${regionName(p.region)} – nur per VPN nutzbar` : p.name, onClick: async () => {
+        try { await api.toggleProvider(p.id, !p.active, p.region); p.active = !p.active; drawProviders(); toast(`${p.name}${abroad ? ' (' + regionName(p.region) + ')' : ''} ${p.active ? 'aktiviert' : 'deaktiviert'}`, 'ok'); }
         catch (e) { toast(e.message, 'err'); }
-      } }, p.logo_path ? h('img', { src: IMG(p.logo_path, 'w92'), alt: '' }) : null, p.name, h('span', {}, p.active ? '✓' : '+')));
+      } }, p.logo_path ? h('img', { src: IMG(p.logo_path, 'w92'), alt: '' }) : null, p.name, abroad ? regionBadge(p.region, 'inline') : null, h('span', {}, p.active ? '✓' : '+')));
     }
   };
   provSearch.addEventListener('input', drawProviders);
+
+  // Zusatzländer (VPN): Angebote dieser Länder werden mitgeladen; aktiv geschaltete Anbieter dort zählen als „meine“.
+  const extra = new Set(st.extra_regions || []);
+  const regionList = h('div', { class: 'prov-list', style: { marginTop: '8px' } });
+  const drawRegions = () => {
+    regionList.innerHTML = '';
+    for (const r of st.regions_available || []) {
+      const on = extra.has(r);
+      regionList.append(h('div', { class: `prov-item ${on ? 'on' : 'off'}`, onClick: async () => {
+        if (on) extra.delete(r); else extra.add(r);
+        try {
+          await api.settings({ extra_regions: [...extra] });
+          toast(on ? `${regionName(r)} entfernt` : `${regionName(r)} hinzugefügt – Anbieter geladen, Bibliothek wird aktualisiert`, 'ok');
+          providers = await api.providers(); drawProviders(); drawRegions(); watchJobs();
+        } catch (e) { if (on) extra.add(r); else extra.delete(r); toast(e.message, 'err'); }
+      } }, regionBadge(r, 'inline big'), regionName(r), h('span', {}, on ? '✓' : '+')));
+    }
+  };
+  drawRegions();
+
   const provPanel = h('div', { class: 'glass panel' },
     h('h2', {}, '📡 Aktive Abos & Quellen'),
     h('p', { class: 'muted small' }, 'Titel gelten als „bei meinen Anbietern verfügbar“, wenn sie hier aktiv sind (Abo/Flatrate oder kostenlos). Zum Hinzufügen einfach suchen und anklicken.'),
@@ -50,6 +71,9 @@ export async function render(root, params) {
     h('label', { class: 'toggle small', style: { marginTop: '14px' } },
       h('input', { type: 'checkbox', checked: !!st.settings.count_all_free, onChange: async (e) => { await api.settings({ count_all_free: e.target.checked }); toast('Gespeichert', 'ok'); } }),
       h('span', { class: 'sw' }), 'Kostenlose Angebote aller Anbieter (z. B. Joyn, Pluto TV) als verfügbar zählen'),
+    h('h3', { style: { marginTop: '18px' } }, '🌍 Weitere Länder (per VPN)'),
+    h('p', { class: 'muted small' }, 'Angebote dieser Länder werden zusätzlich geladen; oben tauchen dann z. B. BBC iPlayer (GB) auf. Nur Anbieter, die du dort aktiv schaltest, zählen als „meine“ – der Rest der Auslandsangebote wird ignoriert. Karten und Detailansicht zeigen solche Angebote mit Länderkürzel.'),
+    regionList,
   );
   if (st.has_key) {
     try { providers = await api.providers(); drawProviders(); } catch (e) { provList.append(h('span', { class: 'muted small' }, e.message)); }

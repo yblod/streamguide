@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 – 2026-09-12
+
+- Detailansicht: Angebote sind Direktlinks zur Titelseite beim Anbieter (Netflix, Disney+, Prime Video, ZDF, …),
+  auch für Serien. Auf iPad/Handy öffnet meist die App des Anbieters, am PC der Web-Player; im TV-Browser bleibt es
+  beim Browser. Quelle: JustWatch.
+- JustWatch wird auch für die VPN-Länder abgefragt, damit z. B. BBC iPlayer und ITVX Links und Sprachdaten haben.
+
 ## 1.4.0 – 2026-09-12
 
 - Neu: **Profile**. Weitere Nutzer (z. B. Kinder) bekommen eine eigene Watchlist, eigene Serien, Bewertungen und

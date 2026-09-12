@@ -281,6 +281,9 @@ label.field > * { color: var(--text); font-weight: 500; }
 .offer { display: flex; align-items: center; gap: 8px; padding: 6px 10px 6px 6px; border-radius: 12px; background: var(--glass); border: 1px solid var(--glass-border); font-size: 0.85rem; font-weight: 600; }
 .offer img { width: 28px; height: 28px; border-radius: 8px; }
 .offer.mine { border-color: var(--ok); box-shadow: 0 0 0 2px rgba(47,180,124,0.25); }
+a.offer { color: inherit; text-decoration: none; cursor: pointer; transition: transform 0.15s, border-color 0.15s; }
+.offer .ext { color: var(--accent); font-weight: 800; }
+@media (hover: hover) { a.offer:hover { transform: translateY(-2px); border-color: var(--accent); } }
 .offer .kind { color: var(--muted); font-weight: 500; font-size: 0.75rem; }
 .stars { display: flex; gap: 4px; flex-wrap: wrap; }
 .stars button { width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--glass-border); background: var(--glass); cursor: pointer; font-weight: 700; font-size: 0.85rem; }

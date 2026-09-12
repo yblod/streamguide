@@ -41,6 +41,13 @@ könnte – als Entscheidungshilfe, ob sich ein Abo gerade lohnt. Gesehenes, ber
 ungesehene Folgen zählen nicht mit; „NUR HIER“ markiert Titel, die kein anderer Streaming-Anbieter hat.
 Varianten eines Anbieters (mit/ohne Werbung, Amazon Channel) gelten als ein Anbieter.
 
+### Direktlinks zu den Anbietern
+
+In der Detailansicht ist jedes Angebot mit „↗“ ein Link zur Titelseite beim Anbieter (Quelle JustWatch, auch für
+die VPN-Länder). Am PC/Mac öffnet der Web-Player, auf iPad/Handy in der Regel die App des Anbieters. Im Browser
+eines Fernsehers öffnet der Link nur im TV-Browser, nicht in der TV-App. Angebote ohne Link kennt JustWatch (noch)
+nicht.
+
 ### Profile
 
 In den Einstellungen (Hauptprofil) lassen sich weitere Profile anlegen, z. B. für Kinder. Jedes Profil hat eine

@@ -1,4 +1,5 @@
-"""JustWatch (inoffizielle GraphQL-Schnittstelle): Wiedergabe-/Untertitelsprachen je Streaming-Angebot in DE.
+"""JustWatch (inoffizielle GraphQL-Schnittstelle): Wiedergabe-/Untertitelsprachen und Direktlinks je Streaming-Angebot
+in DE und den gewählten Zusatzländern (VPN).
 
 TMDB kennt keine Synchronfassungen. JustWatch liefert pro Angebot `audioLanguages`; die Zuordnung zum TMDB-Titel
 erfolgt über die von JustWatch mitgelieferte TMDB-ID. Die Schnittstelle ist nicht offiziell dokumentiert und kann
@@ -12,7 +13,7 @@ from typing import Any
 
 import httpx
 
-from . import db
+from . import db, tmdb
 
 URL = "https://apis.justwatch.com/graphql"
 COUNTRY = "DE"
@@ -60,11 +61,13 @@ def _norm_lang(code: str) -> str:
     return (code or "").split("-")[0].lower()
 
 
-async def lookup(title: str, year: int | None, media_type: str, tmdb_id: int, imdb_id: str | None = None
-                 ) -> dict[str, Any] | None:
-    """Sucht den Titel bei JustWatch und gibt die DE-Angebote mit Sprachen zurück (None = nicht gefunden/Fehler)."""
+async def lookup(title: str, year: int | None, media_type: str, tmdb_id: int, imdb_id: str | None = None,
+                 country: str = COUNTRY) -> dict[str, Any] | None:
+    """Sucht den Titel bei JustWatch und gibt die Angebote eines Landes mit Sprachen und Direktlink zurück
+    (None = Fehler)."""
     want_type = "MOVIE" if media_type == "movie" else "SHOW"
-    body = {"query": QUERY, "variables": {"country": COUNTRY, "language": LANGUAGE, "first": 6,
+    language = LANGUAGE if country == COUNTRY else "en"
+    body = {"query": QUERY, "variables": {"country": country, "language": language, "first": 6,
                                           "filter": {"searchQuery": title, "objectTypes": [want_type]}}}
     async with _sem:
         try:
@@ -117,21 +120,37 @@ def _stale(ts: str | None) -> bool:
         return True
 
 
+async def _lookup_best(row: dict[str, Any], media_type: str, tmdb_id: int, country: str) -> dict[str, Any] | None:
+    """Suche mit deutschem Titel, bei Misserfolg mit dem Originaltitel."""
+    data = await lookup(row.get("title") or row.get("original_title") or "", row.get("year"), media_type, tmdb_id,
+                        row.get("imdb_id"), country)
+    if data is not None and not data["found"] and row.get("original_title") and row["original_title"] != row.get("title"):
+        alt = await lookup(row["original_title"], row.get("year"), media_type, tmdb_id, row.get("imdb_id"), country)
+        if alt and alt["found"]:
+            data = alt
+    return data
+
+
 async def ensure(media_type: str, tmdb_id: int, force: bool = False) -> dict[str, Any] | None:
-    """Sprachdaten für einen Titel sicherstellen (Cache in titles.jw_offers)."""
+    """Sprachdaten und Direktlinks für einen Titel sicherstellen (Cache in titles.jw_offers): DE plus die gewählten
+    Zusatzländer; Angebote aus Zusatzländern tragen `region`. Ändert sich die Länderauswahl, wird neu geladen."""
     row = db.query_one("SELECT title, original_title, year, imdb_id, jw_offers, jw_fetched_at FROM titles WHERE media_type=? AND tmdb_id=?",
                        (media_type, tmdb_id))
     if not row:
         return None
-    if not force and not _stale(row.get("jw_fetched_at")):
-        return db.loads(row.get("jw_offers"), None)
-    data = await lookup(row.get("title") or row.get("original_title") or "", row.get("year"), media_type, tmdb_id, row.get("imdb_id"))
+    old = db.loads(row.get("jw_offers"), None)
+    regions = tmdb.extra_regions()
+    if not force and not _stale(row.get("jw_fetched_at")) and (old or {}).get("regions", []) == regions:
+        return old
+    data = await _lookup_best(row, media_type, tmdb_id, COUNTRY)
     if data is None:
-        return db.loads(row.get("jw_offers"), None)  # Fehler: alte Daten behalten
-    if not data["found"] and row.get("original_title") and row["original_title"] != row.get("title"):
-        alt = await lookup(row["original_title"], row.get("year"), media_type, tmdb_id, row.get("imdb_id"))
-        if alt and alt["found"]:
-            data = alt
+        return old  # Fehler: alte Daten behalten
+    data["regions"] = regions
+    for region in regions:
+        extra = await _lookup_best(row, media_type, tmdb_id, region)
+        if extra and extra.get("found"):
+            data["offers"].extend({**o, "region": region} for o in extra["offers"])
+            data["found"] = True
     db.execute("UPDATE titles SET jw_offers=?, jw_fetched_at=? WHERE media_type=? AND tmdb_id=?",
                (json.dumps(data), datetime.utcnow().replace(microsecond=0).isoformat(), media_type, tmdb_id))
     return data

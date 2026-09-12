@@ -321,30 +321,33 @@ def _dedupe(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _attach_audio(items: list[dict[str, Any]], jw: dict[str, Any] | None, kinds: tuple[str, ...]) -> list[dict[str, Any]]:
-    """Jedem TMDB-Angebot die JustWatch-Sprachen des passenden Anbieters (gleiche Familie, gleiche Art) zuordnen."""
+    """Jedem TMDB-Angebot die JustWatch-Daten des passenden Anbieters (gleiche Familie, gleiche Art, gleiches Land)
+    zuordnen: Wiedergabesprachen und Direktlink zur Titelseite beim Anbieter."""
     if not jw or not jw.get("offers"):
         return items
     out = []
     for p in items:
-        if _region(p) != tmdb.REGION:
-            out.append(p)  # JustWatch-Sprachdaten gelten nur für DE-Angebote
-            continue
+        region = _region(p)
         fam = _family(p.get("name"))
         audio: set[str] = set()
         subs: set[str] = set()
         matched = False
+        url = None
         for o in jw["offers"]:
-            if o.get("kind") not in kinds:
+            if o.get("kind") not in kinds or (o.get("region") or tmdb.REGION) != region:
                 continue
             ofam = _family(o.get("name"))
             if ofam == fam or ofam.startswith(fam) or fam.startswith(ofam):
                 matched = True
                 audio.update(o.get("audio") or [])
                 subs.update(o.get("subs") or [])
+                url = url or o.get("url")
         q = dict(p)
         if matched:
             q["audio"] = sorted(audio)
             q["subs"] = sorted(subs)
+            if url:
+                q["url"] = url
         out.append(q)
     return out
 

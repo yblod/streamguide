@@ -237,9 +237,17 @@ function renderModal(t) {
   if (modal.parentElement) modal.parentElement.scrollTop = 0;
 
   const offers = [];
-  const offerGroup = (list, kind, mine) => list.forEach((p) => offers.push(h('div', { class: `offer ${mine ? 'mine' : ''}`, title: p.region ? `${p.name} in ${regionName(p.region)} – nur per VPN erreichbar` : p.audio && p.audio.length ? `Ton: ${p.audio.map(LANG_LABEL).join(', ')}${p.subs?.length ? ' · Untertitel: ' + p.subs.map(LANG_LABEL).join(', ') : ''}` : `${p.name} (keine Sprachdaten)` },
-    h('img', { src: IMG(p.logo, 'w92'), alt: '' }), h('span', {}, p.name, p.region ? regionBadge(p.region, 'inline') : null, h('div', { class: 'kind' }, p.region ? `${kind} · ${regionName(p.region)} (VPN)` : kind),
-      p.audio && p.audio.length ? h('div', { class: 'audio' }, '🔊 ' + p.audio.map(LANG_LABEL).join(' ')) : null))));
+  // Angebot mit Direktlink (JustWatch) öffnet die Titelseite beim Anbieter in einem neuen Tab; auf iPad/Handy
+  // übernimmt meist die App des Anbieters. Ohne Link bleibt es eine reine Anzeige.
+  const offerGroup = (list, kind, mine) => list.forEach((p) => {
+    const info = p.audio && p.audio.length ? `Ton: ${p.audio.map(LANG_LABEL).join(', ')}${p.subs?.length ? ' · Untertitel: ' + p.subs.map(LANG_LABEL).join(', ') : ''}` : `${p.name} (keine Sprachdaten)`;
+    const vpn = p.region ? `${p.name} in ${regionName(p.region)} – nur per VPN erreichbar. ` : '';
+    const attrs = { class: `offer ${mine ? 'mine' : ''} ${p.url ? 'link' : ''}`, title: `${vpn}${info}${p.url ? ' · Klick: bei ' + p.name + ' öffnen' : ''}` };
+    if (p.url) Object.assign(attrs, { href: p.url, target: '_blank', rel: 'noopener' });
+    offers.push(h(p.url ? 'a' : 'div', attrs,
+      h('img', { src: IMG(p.logo, 'w92'), alt: '' }), h('span', {}, p.name, p.region ? regionBadge(p.region, 'inline') : null, p.url ? h('span', { class: 'ext' }, ' ↗') : null, h('div', { class: 'kind' }, p.region ? `${kind} · ${regionName(p.region)} (VPN)` : kind),
+        p.audio && p.audio.length ? h('div', { class: 'audio' }, '🔊 ' + p.audio.map(LANG_LABEL).join(' ')) : null)));
+  });
   offerGroup(av.sub || [], 'Im Abo ✓', true);
   offerGroup(av.free || [], 'Kostenlos ✓', true);
   offerGroup(av.other_sub || [], 'Abo (nicht aktiv)', false);

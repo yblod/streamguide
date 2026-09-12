@@ -54,12 +54,13 @@ def build_params(media_type: str, f: dict[str, Any]) -> dict[str, Any]:
         p["certification.gte"] = str(min(fsk))
     if f.get("tmdb_min"):
         p["vote_average.gte"] = float(f["tmdb_min"])
+    min_votes = 50 if f.get("min_votes") is None else int(f["min_votes"])  # 0 = keine Untergrenze
     if f.get("adult"):
         p["include_adult"] = "true"
         p["with_keywords"] = "|".join(str(k) for k in ADULT_KEYWORDS)
-        p["vote_count.gte"] = min(int(f.get("min_votes") or 50), 10)
-    else:
-        p["vote_count.gte"] = int(f.get("min_votes") or 50)
+        min_votes = min(min_votes, 10)
+    if min_votes > 0:
+        p["vote_count.gte"] = min_votes
     if f.get("runtime_min") and media_type == "movie":
         p["with_runtime.gte"] = int(f["runtime_min"])
     availability = f.get("availability") or "mine"
@@ -194,7 +195,8 @@ def _sort_results(results: list[dict[str, Any]], f: dict[str, Any], media_types:
 async def run_search(q: str, f: dict[str, Any]) -> dict[str, Any]:
     """Suche (TMDB-Multi-Suche) mit den Entdecken-Filtern: TMDB kennt bei der Suche keine Filter, deshalb werden die
     Treffer lokal gefiltert und wie bei Discover so lange nachgeladen, bis PAGE_SIZE Treffer zusammen sind."""
-    f = _restrict(f)
+    # Bei gezielter Suche keine Mindeststimmen: neue Kinofilme und Nischen-Titel haben oft noch kaum Bewertungen.
+    f = _restrict({**f, "min_votes": 0})
     media_types = [f["media_type"]] if f.get("media_type") in ("movie", "tv") else ["movie", "tv"]
     page = int(f.get("page") or 1)
     results: list[dict[str, Any]] = []

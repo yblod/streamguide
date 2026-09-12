@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 – 2026-09-12
+
+- Entdecken/Suche: Bei einem Suchbegriff gilt keine Mindeststimmenzahl mehr, damit neue Kinofilme und kommende Titel
+  gefunden werden. „Mind. Stimmen“ kennt jetzt „egal“.
+- „Zurücksetzen“ leert wirklich alles: Verfügbarkeit „Alles“, keine Mindeststimmen, Gesehene sichtbar.
+
 ## 1.5.0 – 2026-09-12
 
 - Detailansicht: Angebote sind Direktlinks zur Titelseite beim Anbieter (Netflix, Disney+, Prime Video, ZDF, …),

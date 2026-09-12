@@ -286,7 +286,20 @@ def stats() -> dict[str, Any]:
     return out
 
 
-def provider_coverage(max_titles: int = 40) -> dict[str, list[dict[str, Any]]]:
+# Für die Abo-Übersicht gelten Vertriebswege desselben Katalogs als ein Anbieter (Abo direkt oder über Amazon;
+# Sky Go = Sky-Abo mit WOW-Katalog).
+_COVERAGE_ALIAS = {"sky go": "wow", "sky x": "wow", "wow fiction": "wow"}
+
+
+def _coverage_family(name: str | None) -> str:
+    fam = titles._family(name)
+    for suf in (" amazon channel", " apple tv channel"):
+        if fam.endswith(suf):
+            fam = titles._family(fam[: -len(suf)])  # danach nochmals „+“/„Plus“ usw. abstreifen
+    return _COVERAGE_ALIAS.get(fam, fam)
+
+
+def provider_coverage(max_titles: int = 100) -> dict[str, list[dict[str, Any]]]:
     """Welche Titel der Bibliothek (Watchlist + verfolgte Serien) laufen bei welchem Anbieter – getrennt nach
     aktiven Abos/Quellen und nicht aktiven (Entscheidungshilfe: lohnt sich ein Abo?). Varianten eines Anbieters
     (Netflix / Netflix mit Werbung) werden zusammengefasst."""
@@ -294,37 +307,38 @@ def provider_coverage(max_titles: int = 40) -> dict[str, list[dict[str, Any]]]:
     groups: dict[tuple[str, str], dict[str, Any]] = {}
 
     def add(p: dict[str, Any], t: dict[str, Any], active: bool, free: bool, seen: set[tuple[str, str]]) -> None:
-        key = (titles._family(p.get("name")), p.get("region") or "DE")
-        if key in seen:
-            return
-        seen.add(key)
+        key = (_coverage_family(p.get("name")), p.get("region") or "DE")
         g = groups.setdefault(key, {
             "key": f"{key[0]}|{key[1]}", "name": p.get("name") or "", "logo": p.get("logo"), "region": p.get("region"),
             "ids": set(), "active": active, "free": free, "movies": 0, "tv": 0, "titles": [],
         })
-        if p.get("name") and (not g["name"] or len(p["name"]) < len(g["name"])):
-            g["name"], g["logo"] = p["name"], p.get("logo")
+        g["ids"].add(p["id"])  # alle Varianten (direkt, Amazon Channel …) – Aktivieren schaltet sie gemeinsam
+        if key in seen:
+            return  # Titel je Anbieter nur einmal zählen
+        seen.add(key)
+        pn = p.get("name") or ""
+        if pn and (not g["name"] or ("channel" in g["name"].lower() and "channel" not in pn.lower())
+                   or ("channel" in pn.lower()) == ("channel" in g["name"].lower()) and len(pn) < len(g["name"])):
+            g["name"], g["logo"] = pn, p.get("logo")
         g["free"] = g["free"] and free  # „kostenlos“ nur, wenn der Anbieter nie als Abo/Flatrate auftaucht
-        g["ids"].add(p["id"])
         g["movies" if t["media_type"] == "movie" else "tv"] += 1
         g["titles"].append(t)
 
     for t in rows:
         av = t.get("availability") or {}
+        streams = [(k, p) for k in ("sub", "free", "other_sub", "other_free") for p in av.get(k, [])]
+        families = {(_coverage_family(p.get("name")), p.get("region") or "DE") for _, p in streams}
+        # „nur hier“: kein anderer Streaming-Anbieter (Abo oder kostenlos) hat den Titel
+        t = {**t, "only_here": len(families) == 1}
         seen: set[tuple[str, str]] = set()
-        for p in av.get("sub", []):
-            add(p, t, True, False, seen)
-        for p in av.get("free", []):
-            add(p, t, True, True, seen)
-        for p in av.get("other_sub", []):
-            add(p, t, False, False, seen)
-        for p in av.get("other_free", []):
-            add(p, t, False, True, seen)
+        for kind, p in streams:
+            add(p, t, kind in ("sub", "free"), kind in ("free", "other_free"), seen)
     out: dict[str, list[dict[str, Any]]] = {"active": [], "candidates": []}
     for g in groups.values():
         g["ids"] = sorted(g["ids"])
         g["count"] = g["movies"] + g["tv"]
-        g["titles"].sort(key=lambda t: (t.get("imdb_rating") or 0, t.get("tmdb_rating") or 0), reverse=True)
+        g["exclusive"] = sum(1 for t in g["titles"] if t.get("only_here"))
+        g["titles"].sort(key=lambda t: (bool(t.get("only_here")), t.get("imdb_rating") or 0, t.get("tmdb_rating") or 0), reverse=True)
         g["titles"] = g["titles"][:max_titles]
         out["active" if g["active"] else "candidates"].append(g)
     for lst in out.values():

@@ -1,16 +1,25 @@
 # Changelog
 
+## 1.2.1 – 2026-09-12
+
+- Abos: Titel je Anbieter sind direkt sichtbar (nach „nur hier“ und IMDb sortiert); „NUR HIER“ markiert Titel,
+  die bei keinem anderen Streaming-Anbieter laufen. Vertriebswege desselben Katalogs zählen als ein Anbieter
+  (z. B. HBO Max direkt und über Amazon, WOW/Sky Go), Aktivieren schaltet alle Varianten.
+- Watchlist: Filter „Leihen“ zeigt nur leihbare Titel, die nicht bei den eigenen Anbietern laufen (kein Kaufen).
+
 ## 1.2.0 – 2026-09-12
 
 - Neu: Tab **Abos** – Abos/Quellen direkt verwalten und je Anbieter sehen, welche Titel der Watchlist und der
-  verfolgten Serien dort laufen; für nicht aktive Anbieter als Entscheidungshilfe („lohnt sich ein Abo?“), mit
-  Aktivieren/Deaktivieren und aufklappbarer Titelliste.
+  verfolgten Serien dort laufen (Titelreihe direkt sichtbar, nach IMDb sortiert); für nicht aktive Anbieter als
+  Entscheidungshilfe („lohnt sich ein Abo?“) mit Aktivieren/Deaktivieren. Titel, die bei keinem anderen
+  Streaming-Anbieter laufen, sind mit „NUR HIER“ markiert und stehen vorn.
 - Suche ist in **Entdecken** integriert: Suchtreffer werden mit den Filtern darunter verfeinert (Verfügbarkeit,
   Jahr, Genre, Land, FSK, IMDb …); ohne Suchbegriff arbeitet Entdecken wie bisher. Der Tab „Suche“ entfällt,
   alte Links leiten weiter.
 - Entdecken: „Zurücksetzen“ setzt die Filter jetzt tatsächlich zurück (die Seite wurde zuvor nur ein zweites Mal
   darunter aufgebaut).
-- Watchlist: Filter „Anderes Abo / Leihen“ ist jetzt „Leihen/Kaufen“ und zeigt nur noch Leih-/Kauftitel.
+- Watchlist: Filter „Anderes Abo / Leihen“ ist jetzt „Leihen“ und zeigt nur Titel, die nicht bei den eigenen
+  Anbietern laufen, aber leihbar sind (Kaufangebote bleiben außen vor).
 - Startseite: „Serien weiterschauen oder anfangen“ zeigt nur Serien, die gerade bei den eigenen Anbietern laufen
   (Abo oder kostenlos, z. B. ZDF/Arte).
 

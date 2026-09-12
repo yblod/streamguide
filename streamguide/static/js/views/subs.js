@@ -43,7 +43,7 @@ export async function render(root) {
       activeBox),
     h('section', { class: 'section' },
       h('div', { class: 'row spread', style: { marginBottom: '10px' } }, h('h2', {}, '💡 Lohnt sich ein neues Abo?'),
-        h('span', { class: 'muted small' }, 'So viele Titel deiner Liste würden mit diesem Anbieter verfügbar')),
+        h('span', { class: 'muted small' }, 'Diese Titel deiner Liste würden mit dem Anbieter verfügbar – „NUR HIER“ = bei keinem anderen Streaming-Anbieter')),
       candBox),
   );
 
@@ -52,8 +52,8 @@ export async function render(root) {
     const parts = [];
     if (g.movies) parts.push(`${g.movies} ${g.movies === 1 ? 'Film' : 'Filme'}`);
     if (g.tv) parts.push(`${g.tv} ${g.tv === 1 ? 'Serie' : 'Serien'}`);
-    const body = h('div', { class: 'sub-body', hidden: true });
-    const el = h('div', { class: 'glass panel sub-group' });
+    const body = h('div', { class: 'sub-body' }, hrow(g.titles, { onChange: reload, badge: (t) => t.only_here ? 'NUR HIER' : null }));
+    const el = h('div', { class: 'glass panel sub-group open' });
     const toggleBtn = h('button', { class: `btn sm ${g.active ? 'ghost' : 'primary'}`, title: g.active ? 'Anbieter deaktivieren (Abo gekündigt)' : 'Anbieter aktivieren (Abo abgeschlossen)', onClick: async (e) => {
       e.stopPropagation();
       try {
@@ -63,15 +63,11 @@ export async function render(root) {
       } catch (err) { toast(err.message, 'err'); }
     } }, g.active ? 'Deaktivieren' : '＋ Aktivieren');
     el.append(
-      h('div', { class: 'sub-head', onClick: () => {
-        const open = body.hidden;
-        if (open && !body.childElementCount) body.append(hrow(g.titles, { onChange: reload }));
-        body.hidden = !open; el.classList.toggle('open', open);
-      } },
+      h('div', { class: 'sub-head', title: 'Titelreihe ein-/ausklappen', onClick: () => { body.hidden = !body.hidden; el.classList.toggle('open', !body.hidden); } },
         g.logo ? h('img', { src: IMG(g.logo, 'w92'), alt: '' }) : h('span', { style: { width: '44px' } }),
         h('div', { class: 'grow' },
           h('div', { class: 'n' }, g.name, abroad ? regionBadge(g.region, 'inline') : null, g.free ? h('span', { class: 'muted small', style: { marginLeft: '8px', fontWeight: 600 } }, 'kostenlos') : null),
-          h('div', { class: 'c' }, parts.join(' · ') || 'keine Titel', ' von deiner Liste')),
+          h('div', { class: 'c' }, parts.join(' · ') || 'keine Titel', ' von deiner Liste', g.exclusive ? h('span', { class: 'excl' }, ` · ${g.exclusive} davon nur hier`) : null)),
         h('div', { class: 'n', style: { fontSize: '1.4rem' } }, g.count),
         toggleBtn,
         h('span', { class: 'arrow' }, '▶')),

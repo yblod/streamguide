@@ -295,6 +295,7 @@ label.field > * { color: var(--text); font-weight: 500; }
 .episode input { width: 18px; height: 18px; accent-color: var(--ok); flex: none; }
 .episode .btn { padding: 2px 8px; font-size: 0.75rem; }
 .badge-new.avail { background: var(--ok); }
+.badge-new.only { background: #f5b301; color: #1a1a1a; }
 .badge-status.dropped { background: #777; color: #fff; }
 .progress { height: 8px; border-radius: 999px; background: rgba(120,120,140,0.2); overflow: hidden; }
 .progress > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 999px; transition: width 0.3s; }
@@ -477,3 +478,4 @@ code { background: rgba(120,120,140,0.15); padding: 1px 6px; border-radius: 6px;
 .sub-head .arrow { color: var(--muted); transition: transform 0.2s; font-size: 0.9rem; }
 .sub-group.open .sub-head .arrow { transform: rotate(90deg); }
 .sub-body { padding: 0 16px 14px; }
+.sub-head .excl { color: #f5b301; font-weight: 700; }

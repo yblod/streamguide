@@ -53,7 +53,8 @@ export function card(t, opts = {}) {
     t.poster_path ? h('img', { src: IMG(t.poster_path), loading: 'lazy', alt: '' }) : h('div', { class: 'noposter' }, t.media_type === 'tv' ? '📺' : '🎬'),
     h('div', { class: 'badges' },
       t.imdb_rating ? h('span', { class: 'badge-imdb' }, `★ ${t.imdb_rating.toFixed(1)}`) : (t.tmdb_rating ? h('span', { class: 'badge-status', style: { background: '#01b4e4', color: '#fff' } }, `${t.tmdb_rating.toFixed(1)}`) : h('span')),
-      u.newly_available ? h('span', { class: 'badge-new avail' }, 'JETZT VERFÜGBAR')
+      (opts.badge && opts.badge(t)) ? h('span', { class: 'badge-new only' }, opts.badge(t))
+        : u.newly_available ? h('span', { class: 'badge-new avail' }, 'JETZT VERFÜGBAR')
         : u.new_season_flag ? h('span', { class: 'badge-new' }, u.new_kind === 'season' ? 'NEUE STAFFEL' : 'NEUE FOLGEN')
         : (u.status ? h('span', { class: `badge-status ${u.status}` }, u.status === 'watched' && u.rating ? `✓ ${u.rating}` : STATUS_LABEL[u.status].split(' ')[0]) : null),
     ),

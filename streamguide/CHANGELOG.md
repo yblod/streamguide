@@ -5,7 +5,6 @@
 - Abos: Titel je Anbieter sind direkt sichtbar (nach „nur hier“ und IMDb sortiert); „NUR HIER“ markiert Titel,
   die bei keinem anderen Streaming-Anbieter laufen. Vertriebswege desselben Katalogs zählen als ein Anbieter
   (z. B. HBO Max direkt und über Amazon, WOW/Sky Go), Aktivieren schaltet alle Varianten.
-- Watchlist: Filter „Leihen“ zeigt nur leihbare Titel, die nicht bei den eigenen Anbietern laufen (kein Kaufen).
 
 ## 1.2.0 – 2026-09-12
 

@@ -15,8 +15,8 @@ ADULT_KEYWORDS = (256466, 325693, 155477, 207767, 302868, 298666, 10053, 314184,
 
 
 def _active_sub_ids(region: str = tmdb.REGION) -> list[int]:
-    return [r["id"] for r in db.query("SELECT id FROM providers WHERE active=1 AND region=? ORDER BY display_priority",
-                                      (region,))]
+    """Aktive Anbieter-IDs eines Landes inkl. aller Varianten desselben Katalogs (siehe titles.active_providers)."""
+    return titles.active_ids_by_region().get(region, [])
 
 
 def extra_region_params(media_type: str, f: dict[str, Any]) -> list[dict[str, Any]]:

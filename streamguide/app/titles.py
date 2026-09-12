@@ -234,9 +234,40 @@ async def ensure_many(keys: Iterable[tuple[str, int]], force: bool = False,
 
 # ---------- Anreicherung für die API-Ausgabe ----------
 
+# Vertriebswege desselben Katalogs gelten als ein Anbieter: mit/ohne Werbung, direkt oder als Amazon-/Apple-Channel,
+# Sky Go = Sky-Abo mit WOW-Katalog.
+_CATALOG_ALIAS = {"sky go": "wow", "sky x": "wow", "wow fiction": "wow"}
+
+
+def catalog_family(name: str | None) -> str:
+    fam = _family(name)
+    for suf in (" amazon channel", " apple tv channel"):
+        if fam.endswith(suf):
+            fam = _family(fam[: -len(suf)])  # danach nochmals „+“/„Plus“ usw. abstreifen
+    return _CATALOG_ALIAS.get(fam, fam)
+
+
+APPLE_STORE_ID = 2  # TMDB nennt Kauf-/Leih-Store und Abo (350) beide „Apple TV“ – der Store ist kein Abo
+
+
+def catalog_key(pid: int, name: str | None, region: str | None) -> tuple[str, str]:
+    fam = "apple tv store" if pid == APPLE_STORE_ID else catalog_family(name)
+    return (fam, region or tmdb.REGION)
+
+
 def active_providers() -> set[tuple[int, str]]:
-    """Aktive Anbieter als (TMDB-Anbieter-ID, Land)."""
-    return {(r["id"], r["region"]) for r in db.query("SELECT id, region FROM providers WHERE active=1")}
+    """Aktive Anbieter als (TMDB-Anbieter-ID, Land), erweitert um alle Varianten desselben Katalogs – wer „Netflix
+    Standard mit Werbung“ hat, sieht dieselben Inhalte wie „Netflix“."""
+    rows = db.query("SELECT id, region, name, active FROM providers")
+    fams = {catalog_key(r["id"], r["name"], r["region"]) for r in rows if r["active"]}
+    return {(r["id"], r["region"]) for r in rows if catalog_key(r["id"], r["name"], r["region"]) in fams}
+
+
+def active_ids_by_region() -> dict[str, list[int]]:
+    out: dict[str, list[int]] = {}
+    for pid, region in sorted(active_providers()):
+        out.setdefault(region, []).append(pid)
+    return out
 
 
 def _region(p: dict[str, Any]) -> str:

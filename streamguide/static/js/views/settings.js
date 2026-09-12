@@ -26,25 +26,6 @@ export async function render(root, params) {
     st.has_key ? h('p', { class: 'small', style: { color: 'var(--ok)' } }, '✓ Schlüssel aktiv') : h('p', { class: 'small', style: { color: 'var(--warn)' } }, 'Noch kein Schlüssel – ohne ihn funktionieren Suche, Entdecken und Importe nicht.'),
   );
 
-  // ---------- Aktive Abos ----------
-  const provList = h('div', { class: 'prov-list' });
-  const provSearch = h('input', { type: 'search', placeholder: 'Anbieter suchen (z. B. Disney, Paramount, WOW, Joyn) …', style: { width: '100%' } });
-  let providers = [];
-  const drawProviders = () => {
-    provList.innerHTML = '';
-    const q = provSearch.value.trim().toLowerCase();
-    const list = providers.filter((p) => p.active || (q && p.name.toLowerCase().includes(q)));
-    if (!list.length) provList.append(h('span', { class: 'muted small' }, q ? 'Kein Anbieter gefunden.' : 'Keine aktiven Anbieter.'));
-    for (const p of list) {
-      const abroad = p.region && p.region !== 'DE';
-      provList.append(h('div', { class: `prov-item ${p.active ? 'on' : 'off'}`, title: abroad ? `${p.name} in ${regionName(p.region)} – nur per VPN nutzbar` : p.name, onClick: async () => {
-        try { await api.toggleProvider(p.id, !p.active, p.region); p.active = !p.active; drawProviders(); toast(`${p.name}${abroad ? ' (' + regionName(p.region) + ')' : ''} ${p.active ? 'aktiviert' : 'deaktiviert'}`, 'ok'); }
-        catch (e) { toast(e.message, 'err'); }
-      } }, p.logo_path ? h('img', { src: IMG(p.logo_path, 'w92'), alt: '' }) : null, p.name, abroad ? regionBadge(p.region, 'inline') : null, h('span', {}, p.active ? '✓' : '+')));
-    }
-  };
-  provSearch.addEventListener('input', drawProviders);
-
   // Zusatzländer (VPN): Angebote dieser Länder werden mitgeladen; aktiv geschaltete Anbieter dort zählen als „meine“.
   const extra = new Set(st.extra_regions || []);
   const regionList = h('div', { class: 'prov-list', style: { marginTop: '8px' } });
@@ -57,7 +38,7 @@ export async function render(root, params) {
         try {
           await api.settings({ extra_regions: [...extra] });
           toast(on ? `${regionName(r)} entfernt` : `${regionName(r)} hinzugefügt – Anbieter geladen, Bibliothek wird aktualisiert`, 'ok');
-          providers = await api.providers(); drawProviders(); drawRegions(); watchJobs();
+          drawRegions(); watchJobs();
         } catch (e) { if (on) extra.add(r); else extra.delete(r); toast(e.message, 'err'); }
       } }, regionBadge(r, 'inline big'), regionName(r), h('span', {}, on ? '✓' : '+')));
     }
@@ -65,19 +46,11 @@ export async function render(root, params) {
   drawRegions();
 
   const provPanel = h('div', { class: 'glass panel' },
-    h('h2', {}, '📡 Aktive Abos & Quellen'),
-    h('p', { class: 'muted small' }, 'Titel gelten als „bei meinen Anbietern verfügbar“, wenn sie hier aktiv sind (Abo/Flatrate oder kostenlos). Zum Hinzufügen einfach suchen und anklicken.'),
-    provSearch, h('div', { style: { height: '10px' } }), provList,
-    h('label', { class: 'toggle small', style: { marginTop: '14px' } },
-      h('input', { type: 'checkbox', checked: !!st.settings.count_all_free, onChange: async (e) => { await api.settings({ count_all_free: e.target.checked }); toast('Gespeichert', 'ok'); } }),
-      h('span', { class: 'sw' }), 'Kostenlose Angebote aller Anbieter (z. B. Joyn, Pluto TV) als verfügbar zählen'),
-    h('h3', { style: { marginTop: '18px' } }, '🌍 Weitere Länder (per VPN)'),
-    h('p', { class: 'muted small' }, 'Angebote dieser Länder werden zusätzlich geladen; oben tauchen dann z. B. BBC iPlayer (GB) auf. Nur Anbieter, die du dort aktiv schaltest, zählen als „meine“ – der Rest der Auslandsangebote wird ignoriert. Karten und Detailansicht zeigen solche Angebote mit Länderkürzel.'),
+    h('h2', {}, '🌍 Weitere Länder (per VPN)'),
+    h('p', { class: 'muted small' }, 'Angebote dieser Länder werden zusätzlich geladen; im Tab ', h('a', { href: '#/abos', style: { color: 'var(--accent)' } }, 'Abos'), ' tauchen dann z. B. BBC iPlayer (GB) auf. Nur Anbieter, die du dort aktiv schaltest, zählen als „meine“ – der Rest der Auslandsangebote wird ignoriert. Karten und Detailansicht zeigen solche Angebote mit Länderkürzel.'),
     regionList,
+    h('p', { class: 'muted small', style: { marginTop: '14px' } }, 'Abos und Quellen verwaltest du im Tab ', h('a', { href: '#/abos', style: { color: 'var(--accent)' } }, '💳 Abos'), '.'),
   );
-  if (st.has_key) {
-    try { providers = await api.providers(); drawProviders(); } catch (e) { provList.append(h('span', { class: 'muted small' }, e.message)); }
-  } else provList.append(h('span', { class: 'muted small' }, 'Zuerst TMDB-Schlüssel hinterlegen.'));
 
   // ---------- IMDb-Import ----------
   const imdbMode = h('select', {}, h('option', { value: 'ratings' }, 'Bewertungen (ratings.csv)'), h('option', { value: 'watchlist' }, 'Watchlist (WATCHLIST.csv)'));
@@ -210,7 +183,7 @@ export async function render(root, params) {
       h('button', { class: 'btn', onClick: async () => { try { await api.post('/imdb/dataset'); toast('IMDb-Datensatz wird geladen (~7 MB)', 'ok'); watchJobs(); } catch (e) { toast(e.message, 'err'); } } }, '↻ IMDb-Bewertungen aktualisieren'),
       h('button', { class: 'btn', disabled: !st.has_key, onClick: async () => { try { await api.post('/library/refresh'); toast('Bibliothek wird aktualisiert', 'ok'); watchJobs(); } catch (e) { toast(e.message, 'err'); } } }, '↻ Verfügbarkeiten aktualisieren'),
       h('button', { class: 'btn', disabled: !st.has_key, title: 'IMDb-ID, FSK und Anbieter für alle importierten Titel nachladen', onClick: async () => { try { await api.post('/library/refresh?everything=true'); toast('Details werden für alle Titel nachgeladen', 'ok'); watchJobs(); } catch (e) { toast(e.message, 'err'); } } }, '↻ Alle Titel vervollständigen'),
-      h('button', { class: 'btn', disabled: !st.has_key, onClick: async () => { try { await api.post('/providers/refresh'); toast('Anbieterliste aktualisiert', 'ok'); providers = await api.providers(); drawProviders(); } catch (e) { toast(e.message, 'err'); } } }, '↻ Anbieterliste'),
+      h('button', { class: 'btn', disabled: !st.has_key, onClick: async () => { try { await api.post('/providers/refresh'); toast('Anbieterliste aktualisiert', 'ok'); } catch (e) { toast(e.message, 'err'); } } }, '↻ Anbieterliste'),
       h('a', { class: 'btn', href: '/api/export', download: 'streamguide-export.json' }, '⬇ Bibliothek exportieren (JSON)')),
     h('p', { class: 'muted small' }, 'Der IMDb-Datensatz (offizielle title.ratings) wird beim Start automatisch aktualisiert, wenn er älter als 7 Tage ist. Version ', h('code', {}, st.version || '?'), '.'),
     h('h3', { style: { marginTop: '10px' } }, 'Letzte Jobs'), jobLog,

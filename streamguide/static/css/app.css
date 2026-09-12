@@ -478,4 +478,11 @@ code { background: rgba(120,120,140,0.15); padding: 1px 6px; border-radius: 6px;
 .sub-head .arrow { color: var(--muted); transition: transform 0.2s; font-size: 0.9rem; }
 .sub-group.open .sub-head .arrow { transform: rotate(90deg); }
 .sub-body { padding: 0 16px 14px; }
+.sub-group.static .sub-head { cursor: default; }
+.sub-mine { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.sub-mine .sub-group { margin-bottom: 0; }
+.sub-mine .sub-head { padding: 8px 12px; gap: 10px; }
+.sub-mine .sub-head img { width: 36px; height: 36px; border-radius: 10px; }
+.sub-mine .sub-head .n { font-size: 0.92rem; }
+.sub-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sub-head .excl { color: #f5b301; font-weight: 700; }

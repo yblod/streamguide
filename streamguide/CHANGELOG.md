@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.0 – 2026-09-12
+
+- Abos: Verwaltung der Abos und Quellen ist von den Einstellungen in den Tab „Abos“ gewandert (Zeilen mit
+  Deaktivieren, Hinzufügen per Suche, Schalter für kostenlose Angebote). In den Einstellungen bleiben die
+  VPN-Länder.
+- Abos: Die Übersicht zeigt nur noch, was Abos bringen würden, die man nicht hat. Nicht gezählt werden gesehene
+  Titel, bereits bei den eigenen Anbietern verfügbare Titel und Serien ohne ungesehene Folgen (eine komplett
+  gesehene Serie zählt erst wieder, wenn es eine neue Staffel gibt). Sortierung nach exklusiven Titeln.
+- Varianten desselben Anbieters (Netflix / Netflix mit Werbung, Prime Video / Prime Video mit Werbung, direkt /
+  Amazon Channel) gelten überall als ein Anbieter: Ist eine Variante aktiv, zählen die Angebote aller Varianten.
+
 ## 1.2.1 – 2026-09-12
 
 - Abos: Titel je Anbieter sind direkt sichtbar (nach „nur hier“ und IMDb sortiert); „NUR HIER“ markiert Titel,

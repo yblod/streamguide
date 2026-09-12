@@ -35,9 +35,11 @@ damit Teil der Home-Assistant-Backups. Beim ersten Start lädt die App den IMDb-
 
 ### Abos
 
-Der Tab „Abos“ zeigt die aktiven Abos und Quellen und je Anbieter, wie viele Titel der Watchlist und der
-verfolgten Serien dort laufen. Darunter stehen nicht aktive Anbieter mit derselben Zählung als Entscheidungshilfe,
-ob sich ein Abo gerade lohnt; ein Anbieter lässt sich dort direkt aktivieren oder deaktivieren.
+Im Tab „Abos“ werden die aktiven Abos und Quellen verwaltet (hinzufügen per Suche, deaktivieren). Darunter steht
+für jeden nicht aktiven Anbieter, welche Titel der Watchlist und der verfolgten Serien man damit zusätzlich sehen
+könnte – als Entscheidungshilfe, ob sich ein Abo gerade lohnt. Gesehenes, bereits Verfügbares und Serien ohne
+ungesehene Folgen zählen nicht mit; „NUR HIER“ markiert Titel, die kein anderer Streaming-Anbieter hat.
+Varianten eines Anbieters (mit/ohne Werbung, Amazon Channel) gelten als ein Anbieter.
 
 ### Weitere Länder (per VPN)
 

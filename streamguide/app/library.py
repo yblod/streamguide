@@ -286,61 +286,81 @@ def stats() -> dict[str, Any]:
     return out
 
 
-# Für die Abo-Übersicht gelten Vertriebswege desselben Katalogs als ein Anbieter (Abo direkt oder über Amazon;
-# Sky Go = Sky-Abo mit WOW-Katalog).
-_COVERAGE_ALIAS = {"sky go": "wow", "sky x": "wow", "wow fiction": "wow"}
+def _prefer_name(cur: str, new: str) -> bool:
+    """Anzeigename einer Anbieter-Familie: ohne „Channel“/„with Ads“, sonst der kürzeste."""
+    def rank(n: str) -> tuple[int, int]:
+        low = n.lower()
+        return (("channel" in low) + ("with ads" in low) + ("premium" in low), len(n))
+    return not cur or rank(new) < rank(cur)
 
 
-def _coverage_family(name: str | None) -> str:
-    fam = titles._family(name)
-    for suf in (" amazon channel", " apple tv channel"):
-        if fam.endswith(suf):
-            fam = titles._family(fam[: -len(suf)])  # danach nochmals „+“/„Plus“ usw. abstreifen
-    return _COVERAGE_ALIAS.get(fam, fam)
+def provider_groups() -> list[dict[str, Any]]:
+    """Alle bekannten Anbieter je Katalog-Familie (Varianten zusammengefasst), aktive zuerst."""
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    for r in db.query("SELECT * FROM providers ORDER BY display_priority, name"):
+        key = titles.catalog_key(r["id"], r["name"], r["region"])
+        g = groups.setdefault(key, {"key": f"{key[0]}|{key[1]}", "name": "", "logo": None,
+                                    "region": None if r["region"] == "DE" else r["region"], "ids": [], "active": False,
+                                    "priority": r["display_priority"] or 999})
+        g["ids"].append(r["id"])
+        if r["active"]:
+            g["active"] = True
+        if _prefer_name(g["name"], r["name"]):
+            g["name"], g["logo"] = r["name"], r["logo_path"]
+    out = list(groups.values())
+    out.sort(key=lambda g: (not g["active"], g["priority"], g["name"].lower()))
+    return out
 
 
-def provider_coverage(max_titles: int = 100) -> dict[str, list[dict[str, Any]]]:
-    """Welche Titel der Bibliothek (Watchlist + verfolgte Serien) laufen bei welchem Anbieter – getrennt nach
-    aktiven Abos/Quellen und nicht aktiven (Entscheidungshilfe: lohnt sich ein Abo?). Varianten eines Anbieters
-    (Netflix / Netflix mit Werbung) werden zusammengefasst."""
+def provider_coverage(max_titles: int = 100) -> dict[str, Any]:
+    """Abo-Übersicht: aktive Anbieter (mine), alle Anbieter (providers) und je nicht aktivem Anbieter die Titel der
+    Liste, die man damit zusätzlich sehen könnte (candidates). Nicht gezählt: Gesehenes, bereits bei den eigenen
+    Anbietern Verfügbares und Serien ohne ungesehene Folgen (z. B. komplett gesehene Serie ohne neue Staffel)."""
+    known = {g["key"]: g for g in provider_groups()}
     rows = list_titles(status=["watchlist", "watching"])
     groups: dict[tuple[str, str], dict[str, Any]] = {}
 
-    def add(p: dict[str, Any], t: dict[str, Any], active: bool, free: bool, seen: set[tuple[str, str]]) -> None:
-        key = (_coverage_family(p.get("name")), p.get("region") or "DE")
+    def add(p: dict[str, Any], t: dict[str, Any], free: bool, seen: set[tuple[str, str]]) -> None:
+        key = titles.catalog_key(p["id"], p.get("name"), p.get("region"))
         g = groups.setdefault(key, {
-            "key": f"{key[0]}|{key[1]}", "name": p.get("name") or "", "logo": p.get("logo"), "region": p.get("region"),
-            "ids": set(), "active": active, "free": free, "movies": 0, "tv": 0, "titles": [],
+            "key": f"{key[0]}|{key[1]}", "name": "", "logo": None, "region": p.get("region"),
+            "ids": set(), "free": free, "movies": 0, "tv": 0, "titles": [],
         })
-        g["ids"].add(p["id"])  # alle Varianten (direkt, Amazon Channel …) – Aktivieren schaltet sie gemeinsam
+        g["ids"].add(p["id"])
+        if _prefer_name(g["name"], p.get("name") or ""):
+            g["name"], g["logo"] = p.get("name") or "", p.get("logo")
+        g["free"] = g["free"] and free  # „kostenlos“ nur, wenn der Anbieter nie als Abo/Flatrate auftaucht
         if key in seen:
             return  # Titel je Anbieter nur einmal zählen
         seen.add(key)
-        pn = p.get("name") or ""
-        if pn and (not g["name"] or ("channel" in g["name"].lower() and "channel" not in pn.lower())
-                   or ("channel" in pn.lower()) == ("channel" in g["name"].lower()) and len(pn) < len(g["name"])):
-            g["name"], g["logo"] = pn, p.get("logo")
-        g["free"] = g["free"] and free  # „kostenlos“ nur, wenn der Anbieter nie als Abo/Flatrate auftaucht
         g["movies" if t["media_type"] == "movie" else "tv"] += 1
         g["titles"].append(t)
 
     for t in rows:
         av = t.get("availability") or {}
-        streams = [(k, p) for k in ("sub", "free", "other_sub", "other_free") for p in av.get(k, [])]
-        families = {(_coverage_family(p.get("name")), p.get("region") or "DE") for _, p in streams}
-        # „nur hier“: kein anderer Streaming-Anbieter (Abo oder kostenlos) hat den Titel
-        t = {**t, "only_here": len(families) == 1}
+        if av.get("mine"):
+            continue  # kann ich schon sehen
+        if t["media_type"] == "tv" and series_progress(t)["pending"] <= 0:
+            continue  # alle ausgestrahlten Folgen gesehen – erst eine neue Staffel macht den Anbieter interessant
+        streams = [(k, p) for k in ("other_sub", "other_free") for p in av.get(k, [])]
+        if not streams:
+            continue
+        families = {titles.catalog_key(p["id"], p.get("name"), p.get("region")) for _, p in streams}
+        t = {**t, "only_here": len(families) == 1}  # kein anderer Streaming-Anbieter hat den Titel
         seen: set[tuple[str, str]] = set()
         for kind, p in streams:
-            add(p, t, kind in ("sub", "free"), kind in ("free", "other_free"), seen)
-    out: dict[str, list[dict[str, Any]]] = {"active": [], "candidates": []}
+            add(p, t, kind == "other_free", seen)
+    candidates = []
     for g in groups.values():
-        g["ids"] = sorted(g["ids"])
+        k = known.get(g["key"])
+        if k:  # Name/Logo/IDs aus der Anbietertabelle (alle Varianten), Zählung aus den Titeln
+            g["name"], g["logo"], g["ids"] = k["name"], k["logo"], sorted(set(g["ids"]) | set(k["ids"]))
+        else:
+            g["ids"] = sorted(g["ids"])
         g["count"] = g["movies"] + g["tv"]
         g["exclusive"] = sum(1 for t in g["titles"] if t.get("only_here"))
         g["titles"].sort(key=lambda t: (bool(t.get("only_here")), t.get("imdb_rating") or 0, t.get("tmdb_rating") or 0), reverse=True)
         g["titles"] = g["titles"][:max_titles]
-        out["active" if g["active"] else "candidates"].append(g)
-    for lst in out.values():
-        lst.sort(key=lambda g: (-g["count"], g["name"].lower()))
-    return out
+        candidates.append(g)
+    candidates.sort(key=lambda g: (-g["exclusive"], -g["count"], g["name"].lower()))
+    return {"mine": [g for g in known.values() if g["active"]], "providers": list(known.values()), "candidates": candidates}

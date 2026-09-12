@@ -231,7 +231,51 @@ export async function render(root, params) {
         h('p', { class: 'muted small' }, 'In Home Assistant unter Add-on → Konfiguration ein Passwort eintragen, bevor die App über das Internet erreichbar gemacht wird.')],
   );
 
-  root.append(h('div', { class: 'settings-grid' }, keyPanel, provPanel, imdbPanel, tmdbPanel, listPanel, peoplePanel, dataPanel, backupPanel, accessPanel));
+  // ---------- Profile ----------
+  const others = (st.profiles || []).filter((p) => p.id !== 'main').map((p) => ({ ...p }));
+  const profList = h('div', { style: { display: 'flex', flexDirection: 'column', gap: '8px' } });
+  const mainName = h('input', { type: 'text', value: (st.profiles || []).find((p) => p.id === 'main')?.name || 'Ich', placeholder: 'Name des Hauptprofils', style: { width: '160px' } });
+  const pinInput = h('input', { type: 'password', placeholder: 'PIN (optional)', style: { width: '140px' }, autocomplete: 'new-password' });
+  const saveProfiles = async (extra = {}) => {
+    try {
+      const r = await api.put('/profiles', { profiles: others.map((p) => ({ id: p.id, name: p.name, max_age: p.max_age })), main_name: mainName.value, ...extra });
+      toast('Profile gespeichert', 'ok');
+      st.profiles = r.profiles; drawProfiles();
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  const drawProfiles = () => {
+    profList.innerHTML = '';
+    if (!others.length) profList.append(h('span', { class: 'muted small' }, 'Noch kein weiteres Profil.'));
+    for (const p of others) {
+      profList.append(h('div', { class: 'row', style: { gap: '8px' } },
+        h('span', {}, '🙂'),
+        h('input', { type: 'text', value: p.name, style: { width: '150px' }, onChange: (e) => { p.name = e.target.value; } }),
+        h('label', { class: 'muted small' }, 'Inhalte bis ', h('input', { type: 'number', min: 0, max: 18, value: p.max_age ?? '', placeholder: '–', style: { width: '64px' }, onChange: (e) => { p.max_age = e.target.value === '' ? null : +e.target.value; } }), ' Jahre'),
+        h('button', { class: 'btn sm ghost', title: 'Profil aus der Liste entfernen (Daten bleiben in profiles/ erhalten)', onClick: () => { if (confirm(`Profil „${p.name}“ entfernen?`)) { others.splice(others.indexOf(p), 1); saveProfiles(); } } }, '🗑')));
+    }
+  };
+  drawProfiles();
+  const newName = h('input', { type: 'text', placeholder: 'Name, z. B. Nourin', style: { width: '150px' } });
+  const newAge = h('input', { type: 'number', min: 0, max: 18, value: 15, style: { width: '64px' } });
+  const profilesPanel = h('div', { class: 'glass panel' },
+    h('h2', {}, '👨‍👩‍👧 Profile'),
+    h('p', { class: 'muted small' }, 'Jedes Profil hat eine eigene Watchlist, eigene Serien, Bewertungen und Schauspieler. Abos, TMDB-Schlüssel und Länder gelten für alle. Mit Altersgrenze sieht ein Profil nur Titel mit bekannter Freigabe bis zu diesem Alter (FSK, sonst US-/GB-Einstufung als Näherung); Adult-Modus ist aus. Gewechselt wird über den 👤-Knopf oben rechts.'),
+    profList,
+    h('div', { class: 'row', style: { marginTop: '10px', gap: '8px' } }, newName, h('label', { class: 'muted small' }, 'Inhalte bis ', newAge, ' Jahre'),
+      h('button', { class: 'btn primary sm', onClick: () => { const n = newName.value.trim(); if (!n) return toast('Bitte Namen eingeben', 'err'); others.push({ id: null, name: n, max_age: newAge.value === '' ? null : +newAge.value }); newName.value = ''; saveProfiles(); } }, '＋ Profil anlegen')),
+    h('div', { class: 'row', style: { marginTop: '14px', gap: '8px' } }, h('span', { class: 'muted small' }, 'Hauptprofil:'), mainName, h('button', { class: 'btn sm', onClick: () => saveProfiles() }, 'Speichern')),
+    h('div', { class: 'row', style: { marginTop: '10px', gap: '8px' } }, h('span', { class: 'muted small' }, 'PIN für den Wechsel ins Hauptprofil:'), pinInput,
+      h('button', { class: 'btn sm', onClick: () => { if (!pinInput.value.trim()) return toast('Bitte PIN eingeben', 'err'); saveProfiles({ pin: pinInput.value.trim() }); pinInput.value = ''; } }, 'PIN setzen'),
+      h('button', { class: 'btn sm ghost', onClick: () => saveProfiles({ clear_pin: true }) }, 'PIN entfernen')),
+  );
+
+  if (st.profile && !st.profile.is_main) {
+    const info = h('div', { class: 'glass panel' }, h('h2', {}, `🙂 Profil ${st.profile.name}`),
+      h('p', { class: 'muted small' }, st.profile.max_age != null ? `Dieses Profil sieht nur Inhalte bis ${st.profile.max_age} Jahre. ` : '', 'Abos, TMDB-Schlüssel, Länder, Sicherung und Profile verwaltet das Hauptprofil.'));
+    root.append(h('div', { class: 'settings-grid' }, info, imdbPanel, listPanel, peoplePanel, dataPanel));
+  } else {
+    root.append(h('div', { class: 'settings-grid' }, keyPanel, profilesPanel, provPanel, imdbPanel, tmdbPanel, listPanel, peoplePanel, dataPanel, backupPanel, accessPanel));
+  }
   const onJob = () => loadJobs();
   window.addEventListener('job-finished', onJob);
   return { destroy: () => window.removeEventListener('job-finished', onJob) };

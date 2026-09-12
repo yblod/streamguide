@@ -102,7 +102,14 @@ p { margin: 0.4em 0; }
 }
 .nav a.active { background: var(--accent); color: white; box-shadow: 0 6px 18px rgba(91, 108, 255, 0.35); }
 .nav .ic { font-size: 1rem; }
-.topbar-right { display: flex; gap: 6px; flex-shrink: 0; }
+.topbar-right { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+.profile-btn { height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--glass-border); background: var(--glass-strong); cursor: pointer; font-weight: 700; font-size: 0.85rem; white-space: nowrap; color: inherit; }
+.profile-list { display: flex; flex-direction: column; gap: 8px; }
+.profile-row { display: flex; align-items: center; gap: 12px; text-align: left; padding: 10px 14px; border-radius: 14px; border: 1px solid var(--glass-border); background: var(--glass); cursor: pointer; font: inherit; font-weight: 700; color: inherit; }
+.profile-row.active { border-color: var(--accent); }
+.profile-row .av { font-size: 1.4rem; }
+.profile-row .grow { flex: 1; }
+.profile-row .muted { font-weight: 500; }
 /* Tablet quer (z. B. iPad ~1180 px): kompakter, damit alle acht Einträge samt Theme-Schalter in die Leiste passen */
 @media (max-width: 1250px) {
   .topbar { gap: 10px; padding-left: 12px; }
@@ -483,6 +490,8 @@ code { background: rgba(120,120,140,0.15); padding: 1px 6px; border-radius: 6px;
 .sub-mine .sub-group { margin-bottom: 0; }
 .sub-mine .sub-head { padding: 8px 12px; gap: 10px; }
 .sub-mine .sub-head img { width: 36px; height: 36px; border-radius: 10px; }
-.sub-mine .sub-head .n { font-size: 0.92rem; }
+.sub-mine .sub-head .grow { min-width: 0; }
+.sub-mine .sub-head .n { font-size: 0.92rem; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub-mine .sub-head .btn { flex-shrink: 0; }
 .sub-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .sub-head .excl { color: #f5b301; font-weight: 700; }

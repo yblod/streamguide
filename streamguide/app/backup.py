@@ -28,8 +28,14 @@ def _counts(conn: sqlite3.Connection) -> dict[str, int]:
     return out
 
 
-def export_from_connection(src: sqlite3.Connection, dest_zip: Path, version: str = "dev") -> dict[str, Any]:
-    """Kopiert die Datenbank über die Backup-API, entfernt große/flüchtige Tabellen und packt sie als ZIP."""
+def _profile_files() -> list[Path]:
+    return sorted(db.PROFILES_DIR.glob("*.db")) if db.PROFILES_DIR.exists() else []
+
+
+def export_from_connection(src: sqlite3.Connection, dest_zip: Path, version: str = "dev",
+                           profile_dbs: list[Path] = ()) -> dict[str, Any]:
+    """Kopiert die Datenbank über die Backup-API, entfernt große/flüchtige Tabellen und packt sie als ZIP
+    (zusammen mit den Profil-Datenbanken weiterer Nutzer)."""
     dest_zip.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="sg-export-") as tmp:
         copy = Path(tmp) / DB_NAME
@@ -43,10 +49,26 @@ def export_from_connection(src: sqlite3.Connection, dest_zip: Path, version: str
             counts = _counts(dst)
         finally:
             dst.close()
-        manifest = {"app": "streamguide", "format": 1, "version": version,
-                    "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "counts": counts}
+        # Profil-Datenbanken (weitere Nutzer) über die Backup-API mitnehmen
+        prof_copies: list[tuple[Path, str]] = []
+        for pf in profile_dbs:
+            pc = Path(tmp) / f"profile-{pf.name}"
+            pconn = sqlite3.connect(pf)
+            pdst = sqlite3.connect(pc, isolation_level=None)
+            try:
+                pconn.backup(pdst)
+                pdst.execute("PRAGMA journal_mode=DELETE")
+            finally:
+                pdst.close()
+                pconn.close()
+            prof_copies.append((pc, f"profiles/{pf.name}"))
+        manifest = {"app": "streamguide", "format": 2, "version": version,
+                    "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "counts": counts,
+                    "profiles": [n for _, n in prof_copies]}
         with zipfile.ZipFile(dest_zip, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as z:
             z.write(copy, DB_NAME)
+            for pc, name in prof_copies:
+                z.write(pc, name)
             z.writestr(MANIFEST, json.dumps(manifest, ensure_ascii=False, indent=2))
     manifest["size"] = dest_zip.stat().st_size
     return manifest
@@ -54,9 +76,9 @@ def export_from_connection(src: sqlite3.Connection, dest_zip: Path, version: str
 
 def export_live(dest_zip: Path, version: str = "dev") -> dict[str, Any]:
     """Sicherung der laufenden App-Datenbank."""
-    conn = db.connect()
+    conn = db._main_conn()
     with db._lock:
-        return export_from_connection(conn, dest_zip, version)
+        return export_from_connection(conn, dest_zip, version, _profile_files())
 
 
 def export_file(db_path: Path, dest_zip: Path, version: str = "dev") -> dict[str, Any]:
@@ -131,7 +153,19 @@ def restore(zip_path: Path) -> dict[str, Any]:
                 if side.exists():
                     side.unlink()
             shutil.copy2(new_db, db.DB_PATH)
-            conn = db.connect()
+            # Profil-Datenbanken aus der Sicherung (Format 2); vorhandene werden ersetzt
+            with zipfile.ZipFile(zip_path) as z:
+                for name in z.namelist():
+                    if name.startswith("profiles/") and name.endswith(".db") and "/" not in name[9:]:
+                        db.PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+                        target = db.PROFILES_DIR / name[9:]
+                        for suffix in ("-wal", "-shm"):
+                            side = target.with_name(target.name + suffix)
+                            if side.exists():
+                                side.unlink()
+                        with z.open(name) as src, open(target, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+            conn = db._main_conn()
             ratings = 0
             if had_old:
                 conn.execute("ATTACH DATABASE ? AS old", (str(backup_path),))

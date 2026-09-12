@@ -14,6 +14,7 @@ from . import api, auth, db, imdb, jobs, justwatch, sync, tmdb
 from .version import VERSION
 
 ROOT = Path(__file__).resolve().parent.parent
+PROFILE_COOKIE = "sg_profile"
 STATIC = ROOT / "static"
 
 
@@ -76,7 +77,13 @@ async def guard_and_cache(request: Request, call_next):
             return JSONResponse({"detail": "Nicht angemeldet."}, status_code=401)
         target = request.url.path + (f"?{request.url.query}" if request.url.query else "")
         return RedirectResponse(url=f"/login?next={target}", status_code=303)
-    response = await call_next(request)
+    # Aktives Profil (Cookie) für diese Anfrage setzen; unbekannt → Hauptprofil
+    pid = (request.cookies.get(PROFILE_COOKIE) or "main").strip().lower()
+    token = db.PROFILE.set(pid if pid in db.profile_ids() else "main")
+    try:
+        response = await call_next(request)
+    finally:
+        db.PROFILE.reset(token)
     if request.url.path.startswith("/static") or request.url.path == "/":
         response.headers["Cache-Control"] = "no-cache"
     return response

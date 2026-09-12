@@ -46,7 +46,7 @@ export async function render(root, params = {}) {
         renderGenres(); run();
       } }, off ? `✕ ${name}` : name));
     }
-    genreChips.append(h('button', { class: `chip ${f.adult ? 'active' : ''}`, onClick: () => { f.adult = !f.adult; renderGenres(); run(); } }, 'Adult'));
+    if (window.sgProfile?.max_age == null) genreChips.append(h('button', { class: `chip ${f.adult ? 'active' : ''}`, onClick: () => { f.adult = !f.adult; renderGenres(); run(); } }, 'Adult'));
   };
 
   const seg = (opts, key, onChange) => {
@@ -63,7 +63,8 @@ export async function render(root, params = {}) {
   const fskChips = h('div', { class: 'chips' });
   const renderFsk = () => {
     fskChips.innerHTML = '';
-    for (const v of [0, 6, 12, 16, 18]) {
+    const maxAge = window.sgProfile?.max_age ?? null;
+    for (const v of [0, 6, 12, 16, 18].filter((x) => maxAge == null || x <= maxAge)) {
       const on = f.fsk.includes(v);
       fskChips.append(h('button', { class: `chip ${on ? 'active' : ''}`, onClick: () => { f.fsk = on ? f.fsk.filter((x) => x !== v) : [...f.fsk, v]; renderFsk(); run(); } }, `FSK ${v}`));
     }

@@ -95,6 +95,15 @@ def _fsk_set(f: dict[str, Any]) -> set[int]:
     return set()
 
 
+def _restrict(f: dict[str, Any]) -> dict[str, Any]:
+    """Filter an die Altersgrenze des Profils anpassen: nur erlaubte FSK-Werte, kein Adult-Modus."""
+    limit = db.max_age()
+    if limit is None:
+        return f
+    wanted = _fsk_set(f) or {0, 6, 12, 16, 18}
+    return {**f, "adult": False, "fsk": sorted(v for v in wanted if v <= limit) or [0], "fsk_max": None}
+
+
 def _passes_local(t: dict[str, Any], f: dict[str, Any]) -> bool:
     imdb_min = f.get("imdb_min")
     if imdb_min:
@@ -185,6 +194,7 @@ def _sort_results(results: list[dict[str, Any]], f: dict[str, Any], media_types:
 async def run_search(q: str, f: dict[str, Any]) -> dict[str, Any]:
     """Suche (TMDB-Multi-Suche) mit den Entdecken-Filtern: TMDB kennt bei der Suche keine Filter, deshalb werden die
     Treffer lokal gefiltert und wie bei Discover so lange nachgeladen, bis PAGE_SIZE Treffer zusammen sind."""
+    f = _restrict(f)
     media_types = [f["media_type"]] if f.get("media_type") in ("movie", "tv") else ["movie", "tv"]
     page = int(f.get("page") or 1)
     results: list[dict[str, Any]] = []
@@ -219,6 +229,7 @@ async def run(f: dict[str, Any]) -> dict[str, Any]:
     q = (f.get("q") or "").strip()
     if q:
         return await run_search(q, f)
+    f = _restrict(f)
     media_types = [f["media_type"]] if f.get("media_type") in ("movie", "tv") else ["movie", "tv"]
     page = int(f.get("page") or 1)
     results: list[dict[str, Any]] = []

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.0 – 2026-09-12
+
+- Neu: **Profile**. Weitere Nutzer (z. B. Kinder) bekommen eine eigene Watchlist, eigene Serien, Bewertungen und
+  Schauspieler; Abos, TMDB-Schlüssel, Länder und der Titel-Cache gelten für alle. Anlegen in den Einstellungen
+  (Hauptprofil), Wechsel über den 👤-Knopf oben rechts, optional mit PIN für den Wechsel ins Hauptprofil.
+- Profile mit **Altersgrenze** sehen überall nur Titel mit bekannter Freigabe bis zu diesem Alter (FSK; ohne
+  deutsche Freigabe zählt die US-/GB-Einstufung als Näherung, angezeigt als „FSK ~12“). Adult-Modus, Abo-Änderungen,
+  Sicherung und TMDB-Konto sind für Nebenprofile gesperrt.
+- Sicherung enthält jetzt auch die Profil-Datenbanken (`profiles/`).
+- Abos: Anbieternamen in der Übersicht der eigenen Abos brechen nicht mehr um.
+
 ## 1.3.0 – 2026-09-12
 
 - Abos: Verwaltung der Abos und Quellen ist von den Einstellungen in den Tab „Abos“ gewandert (Zeilen mit

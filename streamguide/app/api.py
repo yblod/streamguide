@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
+import re
 import shutil
 import tempfile
 import time
@@ -11,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
 
 from . import auth, backup, db, discover, imdb, jobs, justwatch, library, people, sync, titles, tmdb
@@ -21,6 +24,16 @@ router = APIRouter(prefix="/api")
 
 SETTING_KEYS = ("tmdb_api_key", "count_all_free", "dislike_threshold", "tmdb_mirror_watchlist", "tmdb_mirror_ratings", "theme",
                 "extra_regions")
+
+
+def _require_main() -> None:
+    """Einstellungen, Abos, Sicherung und TMDB-Konto nur im Hauptprofil."""
+    if db.profile_id() != "main":
+        raise HTTPException(status_code=403, detail="Nur im Hauptprofil möglich.")
+
+
+def _pin_hash(pin: str) -> str:
+    return hashlib.sha256(("streamguide-pin:" + pin.strip()).encode("utf-8")).hexdigest()
 
 
 def _err(e: Exception) -> HTTPException:
@@ -38,6 +51,11 @@ async def status_endpoint(request: Request) -> dict[str, Any]:
     return await status(request)
 
 
+def _profile_info() -> dict[str, Any]:
+    p = db.current_profile()
+    return {**p, "restricted": p.get("max_age") is not None, "is_main": p["id"] == "main"}
+
+
 async def status(request: Request | None = None) -> dict[str, Any]:
     s = db.all_settings()
     key = tmdb.api_key()
@@ -53,6 +71,8 @@ async def status(request: Request | None = None) -> dict[str, Any]:
         "has_key": bool(key),
         "key_masked": (key[:4] + "…" + key[-4:]) if len(key) > 10 else ("•" * len(key)),
         "providers_seeded": bool(db.query_one("SELECT 1 FROM providers LIMIT 1")),
+        "profile": _profile_info(),
+        "profiles": db.profiles(),
         "extra_regions": tmdb.extra_regions(),
         "regions_available": list(tmdb.EXTRA_REGIONS),
         "tmdb_connected": bool(s.get("tmdb_session_id")),
@@ -75,6 +95,7 @@ class SettingsIn(BaseModel):
 
 @router.put("/settings")
 async def put_settings(body: SettingsIn) -> dict[str, Any]:
+    _require_main()
     if body.tmdb_api_key is not None:
         key = body.tmdb_api_key.strip()
         if key:
@@ -142,6 +163,7 @@ class ProviderToggle(BaseModel):
 
 @router.put("/providers/{provider_id}")
 async def toggle_provider(provider_id: int, body: ProviderToggle) -> dict[str, Any]:
+    _require_main()
     db.execute("UPDATE providers SET active=? WHERE id=? AND region=?",
                (1 if body.active else 0, provider_id, body.region.upper()))
     sync.check_new_seasons()
@@ -150,6 +172,7 @@ async def toggle_provider(provider_id: int, body: ProviderToggle) -> dict[str, A
 
 @router.post("/providers/refresh")
 async def refresh_providers() -> dict[str, Any]:
+    _require_main()
     try:
         n = await sync.seed_providers(force=True)
         await sync.seed_genres(force=True)
@@ -221,6 +244,73 @@ async def post_discover(body: DiscoverIn) -> dict[str, Any]:
         raise _err(e)
 
 
+# ---------- Profile ----------
+
+class ProfileIn(BaseModel):
+    id: str | None = None
+    name: str
+    max_age: int | None = None
+
+
+class ProfilesIn(BaseModel):
+    profiles: list[ProfileIn]
+    main_name: str | None = None
+    pin: str | None = None       # neue PIN für den Wechsel ins Hauptprofil
+    clear_pin: bool = False
+
+
+class SwitchIn(BaseModel):
+    id: str
+    pin: str | None = None
+
+
+def _slug(name: str) -> str:
+    base = re.sub(r"[^a-z0-9]+", "-", name.lower().replace("ä", "ae").replace("ö", "oe").replace("ü", "ue").replace("ß", "ss")).strip("-")
+    return base[:32] or "profil"
+
+
+@router.get("/profiles")
+async def get_profiles() -> dict[str, Any]:
+    return {"current": db.profile_id(), "profiles": db.profiles(), "pin_required": bool(db.get_setting("main_pin"))}
+
+
+@router.put("/profiles")
+async def put_profiles(body: ProfilesIn) -> dict[str, Any]:
+    _require_main()
+    out, seen = [], set()
+    for p in body.profiles:
+        pid = (p.id or _slug(p.name)).strip().lower()
+        if pid == "main" or not re.fullmatch(r"[a-z0-9_-]{1,32}", pid):
+            pid = _slug(p.name)
+        while pid in seen:
+            pid += "2"
+        seen.add(pid)
+        out.append({"id": pid, "name": p.name.strip() or pid, "max_age": p.max_age})
+    db.set_setting("profiles", out)
+    if body.main_name is not None:
+        db.set_setting("main_name", body.main_name.strip() or "Ich")
+    if body.clear_pin:
+        db.set_setting("main_pin", "")
+    elif body.pin:
+        db.set_setting("main_pin", _pin_hash(body.pin))
+    return await get_profiles()
+
+
+@router.post("/profiles/switch")
+async def switch_profile(body: SwitchIn) -> JSONResponse:
+    pid = body.id.strip().lower()
+    if pid not in db.profile_ids():
+        raise HTTPException(status_code=404, detail="Profil unbekannt.")
+    if pid == "main":
+        stored = db.get_setting("main_pin") or ""
+        if stored and not hmac.compare_digest(_pin_hash(body.pin or ""), stored):
+            await asyncio.sleep(1.0)
+            raise HTTPException(status_code=403, detail="PIN falsch.")
+    resp = JSONResponse({"ok": True, "profile": pid})
+    resp.set_cookie("sg_profile", pid, max_age=365 * 86400, samesite="lax", path="/")
+    return resp
+
+
 @router.get("/subs")
 async def subs() -> dict[str, Any]:
     """Abo-Übersicht: welche Bibliothekstitel laufen bei aktiven bzw. nicht aktiven Anbietern."""
@@ -254,7 +344,10 @@ async def get_title(media_type: str, tmdb_id: int, refresh: bool = False) -> dic
         row = titles.get_title(media_type, tmdb_id) or row
     except Exception:  # noqa: BLE001 - Sprachdaten sind optional
         pass
-    t = titles.decorate([row])[0]
+    dec = titles.decorate([row])
+    if not dec:
+        raise HTTPException(status_code=404, detail="Dieser Titel ist in diesem Profil nicht verfügbar (Altersgrenze).")
+    t = dec[0]
     if media_type == "tv":
         t["progress"] = library.series_progress(t)
     return t
@@ -680,6 +773,7 @@ async def cancel_job(job_id: str) -> dict[str, Any]:
 
 @router.post("/tmdb/auth/start")
 async def tmdb_auth_start(request: Request) -> dict[str, Any]:
+    _require_main()
     try:
         token = await tmdb.auth_new_token()
     except tmdb.TMDBError as e:
@@ -711,6 +805,7 @@ async def tmdb_auth_callback(request_token: str | None = None, approved: str | N
 
 @router.post("/tmdb/auth/finish")
 async def tmdb_auth_finish() -> dict[str, Any]:
+    _require_main()
     """Fallback, wenn der Redirect nicht funktioniert hat: Session aus dem gespeicherten Token erzeugen."""
     token = db.get_setting("tmdb_request_token")
     if not token:
@@ -728,6 +823,7 @@ async def tmdb_auth_finish() -> dict[str, Any]:
 
 @router.delete("/tmdb/auth")
 async def tmdb_auth_disconnect() -> dict[str, Any]:
+    _require_main()
     for k in ("tmdb_session_id", "tmdb_account_id", "tmdb_username", "tmdb_request_token"):
         db.set_setting(k, None)
     return {"ok": True}
@@ -735,6 +831,7 @@ async def tmdb_auth_disconnect() -> dict[str, Any]:
 
 @router.post("/tmdb/sync")
 async def tmdb_sync() -> dict[str, Any]:
+    _require_main()
     if not sync.tmdb_session():
         raise HTTPException(status_code=428, detail="Kein TMDB-Konto verbunden.")
     try:
@@ -789,6 +886,7 @@ def _prune_backup_files(keep: int = 3) -> None:
 
 @router.get("/backup")
 async def download_backup(background: BackgroundTasks) -> FileResponse:
+    _require_main()
     """Erzeugt eine ZIP-Sicherung (Datenbank ohne IMDb-Datensatz) und liefert sie zum Download."""
     name = f"streamguide-backup-{time.strftime('%Y%m%d-%H%M%S')}.zip"
     dest = BACKUP_DIR / name
@@ -802,6 +900,7 @@ async def download_backup(background: BackgroundTasks) -> FileResponse:
 
 @router.post("/backup/restore")
 async def restore_backup(file: UploadFile = File(...)) -> dict[str, Any]:
+    _require_main()
     """Ersetzt die Datenbank durch eine hochgeladene Sicherung (ZIP aus /api/backup oder tools/export_pc_data.py)."""
     if jobs.running():
         raise HTTPException(status_code=409, detail="Bitte warten, bis laufende Jobs beendet sind.")

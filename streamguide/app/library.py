@@ -108,7 +108,8 @@ def _save_episodes(tmdb_id: int, eps: dict[int, set[int]], t: dict[str, Any] | N
 
 def _title_for(tmdb_id: int) -> dict[str, Any] | None:
     row = titles.get_title("tv", tmdb_id)
-    return titles.decorate([row])[0] if row else None
+    dec = titles.decorate([row]) if row else []
+    return dec[0] if dec else None
 
 
 def _ensure_watching(tmdb_id: int) -> dict[str, Any]:

@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import threading
 from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -15,7 +17,20 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DATA_DIR / "streamguide.db"
 
 _lock = threading.RLock()
-_conn: sqlite3.Connection | None = None
+_conns: dict[str, sqlite3.Connection] = {}
+
+# ---------- Profile ----------
+# Das Hauptprofil („main“) nutzt streamguide.db. Jedes weitere Profil hat eine eigene Datei unter profiles/<id>.db
+# mit nur den Nutzertabellen; die Haupt-Datenbank ist dort als „cache“ angehängt, so dass Titel-Cache, IMDb-Datensatz,
+# Anbieter, Personen und Jobs für alle Profile gemeinsam gelten (unqualifizierte Tabellennamen lösen SQLite zuerst im
+# Profil, dann im angehängten Cache auf). Das aktive Profil steht je Anfrage in der Kontextvariable PROFILE.
+PROFILE: ContextVar[str] = ContextVar("sg_profile", default="main")
+PROFILES_DIR = DATA_DIR / "profiles"
+PROFILE_TABLES = ("settings", "user_titles", "import_log", "user_people", "blocked_people")
+# Einstellungen, die für alle Profile gelten (liegen immer in der Haupt-Datenbank)
+SHARED_KEYS = frozenset({"tmdb_api_key", "extra_regions", "count_all_free", "imdb_dataset_updated", "profiles",
+                         "main_name", "main_pin"})
+_profile_ids_cache: set[str] | None = None
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
@@ -158,22 +173,113 @@ def open_db(path: Path) -> sqlite3.Connection:
     return conn
 
 
-def connect() -> sqlite3.Connection:
-    global _conn
+def _schema_for(tables: tuple[str, ...]) -> str:
+    out = []
+    for stmt in SCHEMA.split(";"):
+        st = stmt.strip()
+        if not st:
+            continue
+        m = re.search(r"TABLE IF NOT EXISTS (\w+)", st) or re.search(r"INDEX IF NOT EXISTS \w+ ON (\w+)", st)
+        if m and m.group(1) in tables:
+            out.append(st + ";")
+    return "\n".join(out)
+
+
+PROFILE_SCHEMA = _schema_for(PROFILE_TABLES)
+
+
+def open_profile_db(path: Path) -> sqlite3.Connection:
+    """Profil-Datenbank (nur Nutzertabellen) öffnen und die Haupt-Datenbank als Cache anhängen."""
+    conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.executescript(PROFILE_SCHEMA)
+    _migrate(conn)
+    conn.execute("ATTACH DATABASE ? AS cache", (str(DB_PATH),))
+    return conn
+
+
+def _main_conn() -> sqlite3.Connection:
     with _lock:
-        if _conn is None:
-            _conn = open_db(DB_PATH)
-        return _conn
+        c = _conns.get("main")
+        if c is None:
+            c = _conns["main"] = open_db(DB_PATH)
+        return c
+
+
+def _main_setting(key: str, default: Any = None) -> Any:
+    conn = _main_conn()
+    with _lock:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    if row is None or row[0] is None:
+        return default
+    try:
+        return json.loads(row[0])
+    except (TypeError, ValueError):
+        return row[0]
+
+
+def profiles() -> list[dict[str, Any]]:
+    """Alle Profile; das Hauptprofil steht immer vorn. max_age = Altersgrenze (None = keine)."""
+    out: list[dict[str, Any]] = [{"id": "main", "name": _main_setting("main_name") or "Ich", "max_age": None}]
+    for raw in _main_setting("profiles", []) or []:
+        pid = str((raw or {}).get("id") or "").strip().lower()
+        if pid and pid != "main" and re.fullmatch(r"[a-z0-9_-]{1,32}", pid):
+            age = raw.get("max_age")
+            out.append({"id": pid, "name": raw.get("name") or pid, "max_age": int(age) if age not in (None, "") else None})
+    return out
+
+
+def profile_ids() -> set[str]:
+    global _profile_ids_cache
+    if _profile_ids_cache is None:
+        _profile_ids_cache = {p["id"] for p in profiles()}
+    return _profile_ids_cache
+
+
+def profile_id() -> str:
+    pid = PROFILE.get() or "main"
+    return pid if pid in profile_ids() else "main"
+
+
+def current_profile() -> dict[str, Any]:
+    pid = profile_id()
+    for p in profiles():
+        if p["id"] == pid:
+            return p
+    return profiles()[0]
+
+
+def max_age() -> int | None:
+    """Altersgrenze des aktiven Profils (None = unbeschränkt)."""
+    return current_profile().get("max_age")
+
+
+def connect() -> sqlite3.Connection:
+    """Verbindung des aktiven Profils (Hauptprofil: Haupt-Datenbank)."""
+    pid = profile_id()
+    if pid == "main":
+        return _main_conn()
+    with _lock:
+        c = _conns.get(pid)
+        if c is None:
+            _main_conn()
+            PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+            c = _conns[pid] = open_profile_db(PROFILES_DIR / f"{pid}.db")
+        return c
 
 
 def close() -> None:
-    """Verbindung schließen (z. B. vor dem Austausch der Datenbankdatei)."""
-    global _conn
+    """Alle Verbindungen schließen (z. B. vor dem Austausch der Datenbankdateien); Profile zuerst (sie hängen am Cache)."""
     with _lock:
-        if _conn is not None:
-            _conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            _conn.close()
-            _conn = None
+        for pid in sorted(_conns, key=lambda k: k == "main"):
+            c = _conns.pop(pid)
+            try:
+                c.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            except sqlite3.Error:
+                pass
+            c.close()
 
 
 MIGRATIONS = (
@@ -194,7 +300,7 @@ MIGRATIONS = (
 def _migrate(conn: sqlite3.Connection) -> None:
     for table, col, decl in MIGRATIONS:
         cols = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
-        if col not in cols:
+        if cols and col not in cols:  # Tabelle fehlt in Profil-Datenbanken → nichts zu tun
             conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")
     _migrate_providers_region(conn)
 
@@ -202,7 +308,7 @@ def _migrate(conn: sqlite3.Connection) -> None:
 def _migrate_providers_region(conn: sqlite3.Connection) -> None:
     """providers: Primärschlüssel (id) -> (id, region), bestehende Zeilen gelten als DE."""
     cols = {r[1] for r in conn.execute("PRAGMA table_info(providers)").fetchall()}
-    if "region" in cols:
+    if not cols or "region" in cols:
         return
     conn.executescript("""
         CREATE TABLE providers_new (
@@ -263,30 +369,46 @@ def executemany(sql: str, rows: list[tuple]) -> None:
 
 # ---------- Settings (Key/Value) ----------
 
+def _settings_conn(key: str) -> sqlite3.Connection:
+    """Gemeinsame Einstellungen liegen in der Haupt-Datenbank, alle anderen im Profil."""
+    return _main_conn() if key in SHARED_KEYS else connect()
+
+
 def get_setting(key: str, default: Any = None) -> Any:
-    row = query_one("SELECT value FROM settings WHERE key=?", (key,))
-    if row is None or row["value"] is None:
+    conn = _settings_conn(key)
+    with _lock:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    if row is None or row[0] is None:
         return default
     try:
-        return json.loads(row["value"])
+        return json.loads(row[0])
     except (TypeError, ValueError):
-        return row["value"]
+        return row[0]
 
 
 def set_setting(key: str, value: Any) -> None:
-    execute(
-        "INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-        (key, json.dumps(value)),
-    )
+    global _profile_ids_cache
+    conn = _settings_conn(key)
+    with _lock:
+        conn.execute("INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                     (key, json.dumps(value)))
+    if key == "profiles":
+        _profile_ids_cache = None
 
 
 def all_settings() -> dict[str, Any]:
+    """Einstellungen des aktiven Profils, ergänzt um die gemeinsamen aus der Haupt-Datenbank."""
     out: dict[str, Any] = {}
-    for r in query("SELECT key, value FROM settings"):
-        try:
-            out[r["key"]] = json.loads(r["value"])
-        except (TypeError, ValueError):
-            out[r["key"]] = r["value"]
+    for conn, only_shared in ((_main_conn(), profile_id() != "main"), (connect(), False)):
+        with _lock:
+            rows = conn.execute("SELECT key, value FROM settings").fetchall()
+        for r in rows:
+            if only_shared and r[0] not in SHARED_KEYS:
+                continue
+            try:
+                out[r[0]] = json.loads(r[1])
+            except (TypeError, ValueError):
+                out[r[0]] = r[1]
     return out
 
 

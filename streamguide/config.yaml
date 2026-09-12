@@ -1,5 +1,5 @@
 name: StreamGuide
-version: "1.3.0"
+version: "1.4.0"
 slug: streamguide
 description: Persönlicher Streaming-Guide und Watch-Tracker für Deutschland (TMDB, IMDb, JustWatch)
 url: https://github.com/yblod/streamguide

@@ -7,6 +7,7 @@ import { h, hrow, skeletons, empty, toast, regionBadge, regionName } from '../ui
 export async function render(root) {
   let st = null;
   try { st = await api.status(); } catch { /* ohne Status weiter */ }
+  const ro = !(st?.profile?.is_main ?? true);  // Nebenprofile sehen die Abos, ändern sie aber nicht
   root.append(h('div', { class: 'page-head' },
     h('div', {}, h('h1', {}, 'Abos 💳'), h('div', { class: 'sub' }, 'Welche Abos und Quellen du hast – und was dir weitere Abos für deine Watchlist und Serien bringen würden.')),
     h('a', { class: 'btn', href: '#/settings' }, '🌍 Länder (VPN)')));
@@ -28,7 +29,7 @@ export async function render(root) {
       h('div', { class: 'row spread', style: { marginBottom: '10px' } }, h('h2', {}, '1 · Diese Abos & Quellen habe ich'),
         h('span', { class: 'muted small' }, 'Titel gelten als „bei meinen Anbietern“, wenn sie hier laufen')),
       mineBox,
-      h('div', { class: 'glass panel', style: { marginTop: '4px' } }, addInput, addBox, freeToggle)),
+      ro ? h('p', { class: 'muted small' }, 'Abos ändern kann nur das Hauptprofil.') : h('div', { class: 'glass panel', style: { marginTop: '4px' } }, addInput, addBox, freeToggle)),
     h('section', { class: 'section' },
       h('div', { class: 'row spread', style: { marginBottom: '10px' } }, h('h2', {}, '2 · Was würden weitere Abos bringen?'),
         h('span', { class: 'muted small' }, 'Nur Titel deiner Liste, die du noch nicht sehen kannst · „NUR HIER“ = bei keinem anderen Anbieter')),
@@ -48,7 +49,7 @@ export async function render(root) {
 
   const mineRow = (g) => h('div', { class: 'glass panel sub-group static' },
     h('div', { class: 'sub-head' }, logoEl(g), h('div', { class: 'grow' }, nameEl(g)),
-      h('button', { class: 'btn sm ghost', title: 'Abo gekündigt / Quelle nicht mehr nutzen', onClick: () => setActive(g, false).catch((e) => toast(e.message, 'err')) }, 'Deaktivieren')));
+      ro ? null : h('button', { class: 'btn sm ghost', title: 'Abo gekündigt / Quelle nicht mehr nutzen', onClick: () => setActive(g, false).catch((e) => toast(e.message, 'err')) }, 'Deaktivieren')));
 
   const drawAdd = () => {
     addBox.innerHTML = '';
@@ -76,7 +77,7 @@ export async function render(root) {
         h('div', { class: 'grow' }, nameEl(g),
           h('div', { class: 'c' }, parts.join(' · '), ' zusätzlich sehbar', g.exclusive ? h('span', { class: 'excl' }, ` · ${g.exclusive} davon nur hier`) : null)),
         h('div', { class: 'n', style: { fontSize: '1.4rem' } }, g.count),
-        h('button', { class: 'btn sm primary', title: 'Abo abgeschlossen – ab jetzt als „meine Anbieter“ zählen', onClick: (e) => { e.stopPropagation(); setActive(g, true).catch((err) => toast(err.message, 'err')); } }, '＋ Aktivieren'),
+        ro ? null : h('button', { class: 'btn sm primary', title: 'Abo abgeschlossen – ab jetzt als „meine Anbieter“ zählen', onClick: (e) => { e.stopPropagation(); setActive(g, true).catch((err) => toast(err.message, 'err')); } }, '＋ Aktivieren'),
         h('span', { class: 'arrow' }, '▶')),
       body);
     return el;

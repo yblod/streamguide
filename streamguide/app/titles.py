@@ -48,18 +48,33 @@ def lite_from_result(media_type: str, r: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# Ohne deutsche Freigabe: US-/GB-Einstufung als FSK-Näherung („~12“), damit die Altersgrenze eines Profils greift.
+_FALLBACK_CERT = {
+    ("movie", "US"): {"G": "~0", "PG": "~6", "PG-13": "~12", "R": "~16", "NC-17": "~18"},
+    ("tv", "US"): {"TV-Y": "~0", "TV-Y7": "~6", "TV-G": "~0", "TV-PG": "~6", "TV-14": "~12", "TV-MA": "~16"},
+    ("movie", "GB"): {"U": "~0", "PG": "~6", "12": "~12", "12A": "~12", "15": "~16", "18": "~18"},
+    ("tv", "GB"): {"U": "~0", "PG": "~6", "12": "~12", "15": "~16", "18": "~18"},
+}
+
+
 def _certification(media_type: str, d: dict[str, Any]) -> str | None:
+    found: dict[str, str] = {}
     if media_type == "movie":
         for entry in (d.get("release_dates") or {}).get("results", []):
-            if entry.get("iso_3166_1") == "DE":
-                for rd in entry.get("release_dates", []):
-                    c = (rd.get("certification") or "").strip()
-                    if c:
-                        return c
+            for rd in entry.get("release_dates", []):
+                c = (rd.get("certification") or "").strip()
+                if c and entry.get("iso_3166_1") not in found:
+                    found[entry.get("iso_3166_1")] = c
     else:
         for entry in (d.get("content_ratings") or {}).get("results", []):
-            if entry.get("iso_3166_1") == "DE" and entry.get("rating"):
-                return str(entry["rating"]).strip()
+            if entry.get("rating") and entry.get("iso_3166_1") not in found:
+                found[entry.get("iso_3166_1")] = str(entry["rating"]).strip()
+    if "DE" in found:
+        return found["DE"]
+    for country in ("US", "GB"):
+        mapped = _FALLBACK_CERT.get((media_type, country), {}).get(found.get(country, "").upper())
+        if mapped:
+            return mapped
     return None
 
 
@@ -406,6 +421,9 @@ def decorate(rows: list[dict[str, Any]], user_map: dict[tuple[str, int], dict[st
     """Titelzeilen aus der DB in API-Objekte verwandeln (IMDb-Rating, Genres, Verfügbarkeit, Nutzerstatus)."""
     if not rows:
         return []
+    limit = db.max_age()
+    if limit is not None:
+        rows = [r for r in rows if age_ok(r.get("certification"), limit)]  # Altersgrenze des Profils
     active = active_providers()
     count_all_free = bool(db.get_setting("count_all_free", False))
     gmap = genre_map()
@@ -494,5 +512,13 @@ def aired_seasons(t: dict[str, Any]) -> list[int]:
 def fsk_value(cert: str | None) -> int | None:
     if not cert:
         return None
-    c = cert.upper().replace("FSK", "").replace("AB", "").strip()
+    c = cert.upper().replace("FSK", "").replace("AB", "").replace("~", "").strip()
     return FSK_ORDER.get(c)
+
+
+def age_ok(cert: str | None, limit: int | None) -> bool:
+    """Altersgrenze eines Profils: nur Titel mit bekannter Freigabe bis zur Grenze."""
+    if limit is None:
+        return True
+    v = fsk_value(cert)
+    return v is not None and v <= limit

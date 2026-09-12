@@ -41,6 +41,18 @@ könnte – als Entscheidungshilfe, ob sich ein Abo gerade lohnt. Gesehenes, ber
 ungesehene Folgen zählen nicht mit; „NUR HIER“ markiert Titel, die kein anderer Streaming-Anbieter hat.
 Varianten eines Anbieters (mit/ohne Werbung, Amazon Channel) gelten als ein Anbieter.
 
+### Profile
+
+In den Einstellungen (Hauptprofil) lassen sich weitere Profile anlegen, z. B. für Kinder. Jedes Profil hat eine
+eigene Watchlist, eigene Serien, Bewertungen und Schauspieler (eigene Datei unter `/data/profiles/`, in der
+Sicherung enthalten). Abos, TMDB-Schlüssel, Länder und der Titel-Cache sind gemeinsam. Der Wechsel erfolgt über den
+👤-Knopf oben rechts; für den Wechsel zurück ins Hauptprofil kann eine PIN gesetzt werden.
+
+Ein Profil mit Altersgrenze (z. B. „bis 15 Jahre“) sieht in Suche, Entdecken, Startseite, Filmografien und Details
+nur Titel mit bekannter Freigabe bis zu diesem Alter. Grundlage ist die deutsche FSK; fehlt sie, wird die US- oder
+GB-Einstufung als Näherung verwendet (Anzeige „FSK ~12“). Titel ganz ohne Einstufung bleiben ausgeblendet. Die
+Altersgrenze wird im Hauptprofil in den Einstellungen geändert.
+
 ### Weitere Länder (per VPN)
 
 Wer per VPN auch ausländische Mediatheken nutzt (z. B. BBC iPlayer in Großbritannien), wählt in den Einstellungen

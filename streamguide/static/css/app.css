@@ -466,3 +466,14 @@ code { background: rgba(120,120,140,0.15); padding: 1px 6px; border-radius: 6px;
   .cast-card, .credit, .person-card, .card, .btn, .icon-btn { -webkit-tap-highlight-color: transparent; }
   .card:active, .cast-card:active, .person-card:active { transform: scale(0.97); }
 }
+
+/* Abo-Übersicht */
+.sub-group { margin-bottom: 12px; padding: 0; overflow: hidden; }
+.sub-head { display: flex; align-items: center; gap: 14px; padding: 12px 16px; cursor: pointer; user-select: none; }
+.sub-head img { width: 44px; height: 44px; border-radius: 12px; background: #fff; flex-shrink: 0; }
+.sub-head .n { font-weight: 800; font-size: 1.02rem; display: flex; align-items: center; }
+.sub-head .c { color: var(--muted); font-size: 0.85rem; font-weight: 600; }
+.sub-head .grow { flex: 1; min-width: 0; }
+.sub-head .arrow { color: var(--muted); transition: transform 0.2s; font-size: 0.9rem; }
+.sub-group.open .sub-head .arrow { transform: rotate(90deg); }
+.sub-body { padding: 0 16px 14px; }

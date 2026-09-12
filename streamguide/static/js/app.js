@@ -9,8 +9,9 @@ import * as series from './views/series.js';
 import * as people from './views/people.js';
 import * as history from './views/history.js';
 import * as settings from './views/settings.js';
+import * as subs from './views/subs.js';
 
-const routes = { home, discover, search, watchlist, series, people, history, settings };
+const routes = { home, discover, search, watchlist, series, abos: subs, people, history, settings };
 const app = document.getElementById('app');
 let current = null;
 

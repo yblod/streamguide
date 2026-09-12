@@ -33,6 +33,12 @@ Alles liegt in `/data` des Add-ons (SQLite-Datenbank `streamguide.db`, Sicherung
 damit Teil der Home-Assistant-Backups. Beim ersten Start lädt die App den IMDb-Bewertungsdatensatz (~7 MB,
 1,7 Mio. Zeilen); das dauert auf dem Pi einige Minuten und läuft im Hintergrund.
 
+### Abos
+
+Der Tab „Abos“ zeigt die aktiven Abos und Quellen und je Anbieter, wie viele Titel der Watchlist und der
+verfolgten Serien dort laufen. Darunter stehen nicht aktive Anbieter mit derselben Zählung als Entscheidungshilfe,
+ob sich ein Abo gerade lohnt; ein Anbieter lässt sich dort direkt aktivieren oder deaktivieren.
+
 ### Weitere Länder (per VPN)
 
 Wer per VPN auch ausländische Mediatheken nutzt (z. B. BBC iPlayer in Großbritannien), wählt in den Einstellungen

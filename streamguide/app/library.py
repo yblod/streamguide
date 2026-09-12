@@ -284,3 +284,49 @@ def stats() -> dict[str, Any]:
     out["imdb_dataset_updated"] = db.get_setting("imdb_dataset_updated")
     out["titles_cached"] = (db.query_one("SELECT COUNT(*) AS n FROM titles") or {}).get("n", 0)
     return out
+
+
+def provider_coverage(max_titles: int = 40) -> dict[str, list[dict[str, Any]]]:
+    """Welche Titel der Bibliothek (Watchlist + verfolgte Serien) laufen bei welchem Anbieter – getrennt nach
+    aktiven Abos/Quellen und nicht aktiven (Entscheidungshilfe: lohnt sich ein Abo?). Varianten eines Anbieters
+    (Netflix / Netflix mit Werbung) werden zusammengefasst."""
+    rows = list_titles(status=["watchlist", "watching"])
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def add(p: dict[str, Any], t: dict[str, Any], active: bool, free: bool, seen: set[tuple[str, str]]) -> None:
+        key = (titles._family(p.get("name")), p.get("region") or "DE")
+        if key in seen:
+            return
+        seen.add(key)
+        g = groups.setdefault(key, {
+            "key": f"{key[0]}|{key[1]}", "name": p.get("name") or "", "logo": p.get("logo"), "region": p.get("region"),
+            "ids": set(), "active": active, "free": free, "movies": 0, "tv": 0, "titles": [],
+        })
+        if p.get("name") and (not g["name"] or len(p["name"]) < len(g["name"])):
+            g["name"], g["logo"] = p["name"], p.get("logo")
+        g["free"] = g["free"] and free  # „kostenlos“ nur, wenn der Anbieter nie als Abo/Flatrate auftaucht
+        g["ids"].add(p["id"])
+        g["movies" if t["media_type"] == "movie" else "tv"] += 1
+        g["titles"].append(t)
+
+    for t in rows:
+        av = t.get("availability") or {}
+        seen: set[tuple[str, str]] = set()
+        for p in av.get("sub", []):
+            add(p, t, True, False, seen)
+        for p in av.get("free", []):
+            add(p, t, True, True, seen)
+        for p in av.get("other_sub", []):
+            add(p, t, False, False, seen)
+        for p in av.get("other_free", []):
+            add(p, t, False, True, seen)
+    out: dict[str, list[dict[str, Any]]] = {"active": [], "candidates": []}
+    for g in groups.values():
+        g["ids"] = sorted(g["ids"])
+        g["count"] = g["movies"] + g["tv"]
+        g["titles"].sort(key=lambda t: (t.get("imdb_rating") or 0, t.get("tmdb_rating") or 0), reverse=True)
+        g["titles"] = g["titles"][:max_titles]
+        out["active" if g["active"] else "candidates"].append(g)
+    for lst in out.values():
+        lst.sort(key=lambda g: (-g["count"], g["name"].lower()))
+    return out

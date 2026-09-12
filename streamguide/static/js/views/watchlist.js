@@ -19,7 +19,7 @@ export async function render(root, params) {
     let list = items;
     if (f.only === 'available') list = list.filter((t) => t.availability?.mine);
     else if (f.only === 'free') list = list.filter((t) => t.availability?.mode === 'free');
-    else if (f.only === 'other') list = list.filter((t) => ['other_sub', 'rent'].includes(t.availability?.mode));
+    else if (f.only === 'rent') list = list.filter((t) => !t.availability?.mine && ((t.availability?.rent || []).length || (t.availability?.buy || []).length));
     else if (f.only === 'none') list = list.filter((t) => !t.availability || t.availability.mode === 'none');
     results.innerHTML = '';
     results.append(grid(list, { onChange: () => load(), emptyText: items.length ? 'Keine Titel in dieser Kategorie.' : 'Die Watchlist ist leer – Titel per Suche hinzufügen oder in den Einstellungen importieren.', emptyIcon: '🔖' }));
@@ -40,7 +40,7 @@ export async function render(root, params) {
       h('button', { class: 'btn', onClick: async () => { try { await api.post('/library/refresh'); toast('Aktualisierung gestartet'); } catch (e) { toast(e.message, 'err'); } } }, '↻ Verfügbarkeit aktualisieren')),
     h('div', { class: 'glass panel row spread' },
       h('div', { class: 'row' },
-        seg([['all', 'Alle'], ['available', 'Bei meinen Anbietern'], ['free', 'Kostenlos'], ['other', 'Anderes Abo / Leihen'], ['none', 'Nicht verfügbar']], 'only')),
+        seg([['all', 'Alle'], ['available', 'Bei meinen Anbietern'], ['free', 'Kostenlos'], ['rent', 'Leihen/Kaufen'], ['none', 'Nicht verfügbar']], 'only')),
       h('div', { class: 'row' }, seg([['added', 'Neueste'], ['title', 'A–Z'], ['year', 'Jahr']], 'sort'), count)),
     h('div', { style: { height: '18px' } }),
     results,

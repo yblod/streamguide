@@ -7,7 +7,7 @@ export async function render(root) {
     h('div', {}, h('h1', {}, 'Heute Abend 🍿'), h('div', { class: 'sub' }, 'Aus deiner Watchlist, deinen Serien und den Angeboten deiner Anbieter.')),
     h('div', { class: 'row' },
       h('a', { class: 'btn', href: '#/discover' }, '🧭 Entdecken'),
-      h('a', { class: 'btn', href: '#/search' }, '🔍 Suchen')));
+      h('a', { class: 'btn', href: '#/abos' }, '💳 Abos')));
   const body = h('div', {}, skeletons(6));
   root.append(head, body);
 
@@ -28,7 +28,7 @@ export async function render(root) {
         d.available_watchlist.length ? hrow(d.available_watchlist, { onChange: reload })
           : empty(d.counts.watchlist ? 'Nichts aus deiner Watchlist ist gerade bei deinen Anbietern.' : 'Deine Watchlist ist leer. Importiere sie in den Einstellungen oder füge Titel über die Suche hinzu.', '🔖'),
         h('a', { class: 'btn sm', href: '#/watchlist' }, 'Alle')));
-      if (d.continue_watching.length) body.append(section('📺 Serien: weiterschauen oder anfangen', hrow(d.continue_watching, { onChange: reload }), h('a', { class: 'btn sm', href: '#/series' }, 'Alle')));
+      if (d.continue_watching.length) body.append(section('📺 Serien bei deinen Anbietern: weiterschauen oder anfangen', hrow(d.continue_watching, { onChange: reload }), h('a', { class: 'btn sm', href: '#/series' }, 'Alle')));
       if (d.from_people?.length) body.append(section('🎭 Neu von deinen Schauspielern', hrow(d.from_people, { onChange: reload, showPeople: true }), h('a', { class: 'btn sm', href: '#/people' }, 'Alle')));
       if (d.upcoming.length) body.append(section('📅 Demnächst neue Folgen',
         h('div', { class: 'chips' }, ...d.upcoming.map((t) => h('span', { class: 'chip', onClick: () => card(t).click() }, `${t.title} · ${fmtDate(t.next_episode_air)}`)))));

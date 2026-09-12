@@ -132,8 +132,93 @@ def _passes_local(t: dict[str, Any], f: dict[str, Any]) -> bool:
     return True
 
 
+def _passes_search(t: dict[str, Any], f: dict[str, Any]) -> bool:
+    """Filter, die Discover sonst TMDB überlässt – bei der Suche lokal angewandt (Jahr, Genre, Land, Stimmen,
+    Bewertung, Originalsprache, Verfügbarkeitsart)."""
+    y = t.get("year")
+    if f.get("year_from") and (y is None or y < int(f["year_from"])):
+        return False
+    if f.get("year_to") and (y is None or y > int(f["year_to"])):
+        return False
+    gids = set(t.get("genre_ids") or [])
+    if f.get("genres") and not (gids & {int(g) for g in f["genres"]}):
+        return False
+    if f.get("exclude_genres") and gids & {int(g) for g in f["exclude_genres"]}:
+        return False
+    if f.get("countries"):
+        want = {str(c).upper() for c in f["countries"]}
+        if not (want & {str(c).upper() for c in (t.get("origin_countries") or [])}):
+            return False
+    if f.get("language") and t.get("original_language") != f["language"]:
+        return False
+    if f.get("tmdb_min") and (t.get("tmdb_rating") or 0) < float(f["tmdb_min"]):
+        return False
+    min_votes = int(f.get("min_votes") or 0)
+    if min_votes and (t.get("tmdb_votes") or 0) < min_votes:
+        return False
+    av = t.get("availability") or {}
+    mode = f.get("availability") or "mine"
+    if mode == "free" and not (av.get("free") or av.get("other_free")):
+        return False
+    if mode == "stream" and not (av.get("sub") or av.get("free") or av.get("other_sub") or av.get("other_free")):
+        return False
+    if mode == "rent" and not (av.get("rent") or av.get("buy")):
+        return False
+    return True  # "mine" prüft _passes_local, "any" alles
+
+
+def _sort_results(results: list[dict[str, Any]], f: dict[str, Any], media_types: list[str], local_all: bool) -> None:
+    """Sortierung: Discover sortiert bei TMDB vor (nur IMDb lokal), die Suche komplett lokal."""
+    sort = f.get("sort") or "popularity"
+    if sort == "imdb":
+        results.sort(key=lambda t: (t.get("imdb_rating") or 0, t.get("imdb_votes") or 0), reverse=True)
+    elif local_all and sort == "tmdb":
+        results.sort(key=lambda t: (t.get("tmdb_rating") or 0, t.get("tmdb_votes") or 0), reverse=True)
+    elif local_all and sort == "votes":
+        results.sort(key=lambda t: t.get("tmdb_votes") or 0, reverse=True)
+    elif local_all and sort in ("newest", "oldest"):
+        results.sort(key=lambda t: t.get("year") or 0, reverse=(sort == "newest"))
+    elif len(media_types) > 1 and sort == "popularity":
+        results.sort(key=lambda t: t.get("tmdb_votes") or 0, reverse=True)
+
+
+async def run_search(q: str, f: dict[str, Any]) -> dict[str, Any]:
+    """Suche (TMDB-Multi-Suche) mit den Entdecken-Filtern: TMDB kennt bei der Suche keine Filter, deshalb werden die
+    Treffer lokal gefiltert und wie bei Discover so lange nachgeladen, bis PAGE_SIZE Treffer zusammen sind."""
+    media_types = [f["media_type"]] if f.get("media_type") in ("movie", "tv") else ["movie", "tv"]
+    page = int(f.get("page") or 1)
+    results: list[dict[str, Any]] = []
+    exhausted = True
+    last_page = page
+    for p in range(page, page + MAX_PAGES_PER_CALL):
+        last_page = p
+        data = await tmdb.search_multi(q, p)
+        hits = [r for r in data.get("results", []) if r.get("media_type") in media_types]
+        for r in hits:
+            titles.upsert_lite(r["media_type"], r)
+        keys = [(r["media_type"], r["id"]) for r in hits]
+        await titles.ensure_many(keys)
+        if f.get("languages"):
+            await justwatch.ensure_many(keys)
+        rows = [titles.get_title(mt, tid) for mt, tid in keys]
+        decorated = titles.decorate([r for r in rows if r])
+        results.extend(t for t in decorated if _passes_search(t, f) and _passes_local(t, f))
+        if p >= int(data.get("total_pages") or 0):
+            exhausted = True
+            break
+        exhausted = False
+        if len(results) >= PAGE_SIZE:
+            break
+    _sort_results(results, f, media_types, local_all=True)
+    return {"results": results, "next_page": None if exhausted else last_page + 1, "page": page}
+
+
 async def run(f: dict[str, Any]) -> dict[str, Any]:
-    """Discover mit Nachladen mehrerer TMDB-Seiten, bis PAGE_SIZE lokale Treffer zusammen sind."""
+    """Discover mit Nachladen mehrerer TMDB-Seiten, bis PAGE_SIZE lokale Treffer zusammen sind.
+    Mit Suchbegriff (`q`) stattdessen Suche mit lokal angewandten Filtern."""
+    q = (f.get("q") or "").strip()
+    if q:
+        return await run_search(q, f)
     media_types = [f["media_type"]] if f.get("media_type") in ("movie", "tv") else ["movie", "tv"]
     page = int(f.get("page") or 1)
     results: list[dict[str, Any]] = []
@@ -168,11 +253,7 @@ async def run(f: dict[str, Any]) -> dict[str, Any]:
         exhausted = False
         if len(results) >= PAGE_SIZE:
             break
-    sort = f.get("sort") or "popularity"
-    if sort == "imdb":
-        results.sort(key=lambda t: (t.get("imdb_rating") or 0, t.get("imdb_votes") or 0), reverse=True)
-    elif len(media_types) > 1 and sort == "popularity":
-        results.sort(key=lambda t: t.get("tmdb_votes") or 0, reverse=True)
+    _sort_results(results, f, media_types, local_all=False)
     return {"results": results, "next_page": None if exhausted else last_page + 1, "page": page}
 
 
@@ -204,8 +285,10 @@ async def home() -> dict[str, Any]:
     for t in watching:
         t["progress"] = library.series_progress(t)
     new_seasons = [t for t in watching if t["user"].get("new_season_flag")]
-    continue_watching = [t for t in watching if t["progress"]["pending"] > 0 and not t["user"].get("new_season_flag")]
-    continue_watching.sort(key=lambda t: (not (t.get("availability") or {}).get("mine"), not t["progress"]["started"]))
+    # Weiterschauen: nur Serien, die gerade bei den eigenen Anbietern laufen (Abo oder kostenlos)
+    continue_watching = [t for t in watching if t["progress"]["pending"] > 0 and not t["user"].get("new_season_flag")
+                         and (t.get("availability") or {}).get("mine")]
+    continue_watching.sort(key=lambda t: not t["progress"]["started"])
     newly_available = [t for t in watchlist + watching if t["user"].get("newly_available")]
     upcoming = sorted([t for t in watching if t.get("next_episode_air")], key=lambda t: t["next_episode_air"])[:12]
 

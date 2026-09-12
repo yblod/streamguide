@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.0 – 2026-09-12
+
+- Neu: Tab **Abos** – Abos/Quellen direkt verwalten und je Anbieter sehen, welche Titel der Watchlist und der
+  verfolgten Serien dort laufen; für nicht aktive Anbieter als Entscheidungshilfe („lohnt sich ein Abo?“), mit
+  Aktivieren/Deaktivieren und aufklappbarer Titelliste.
+- Suche ist in **Entdecken** integriert: Suchtreffer werden mit den Filtern darunter verfeinert (Verfügbarkeit,
+  Jahr, Genre, Land, FSK, IMDb …); ohne Suchbegriff arbeitet Entdecken wie bisher. Der Tab „Suche“ entfällt,
+  alte Links leiten weiter.
+- Entdecken: „Zurücksetzen“ setzt die Filter jetzt tatsächlich zurück (die Seite wurde zuvor nur ein zweites Mal
+  darunter aufgebaut).
+- Watchlist: Filter „Anderes Abo / Leihen“ ist jetzt „Leihen/Kaufen“ und zeigt nur noch Leih-/Kauftitel.
+- Startseite: „Serien weiterschauen oder anfangen“ zeigt nur Serien, die gerade bei den eigenen Anbietern laufen
+  (Abo oder kostenlos, z. B. ZDF/Arte).
+
 ## 1.1.0 – 2026-09-11
 
 - Neu: **Weitere Länder (per VPN)** in den Einstellungen, z. B. Großbritannien für BBC iPlayer. Angebote der gewählten

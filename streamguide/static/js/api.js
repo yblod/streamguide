@@ -39,6 +39,7 @@ export const api = {
   home: () => req('GET', '/home'),
   search: (q, page = 1) => req('GET', `/search?q=${encodeURIComponent(q)}&page=${page}`),
   discover: (f) => req('POST', '/discover', f),
+  subs: () => req('GET', '/subs'),
   forYou: () => req('GET', '/for-you'),
   title: (mt, id, refresh = false) => req('GET', `/title/${mt}/${id}${refresh ? '?refresh=true' : ''}`),
   season: (id, n) => req('GET', `/title/tv/${id}/season/${n}`),

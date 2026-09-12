@@ -189,6 +189,7 @@ async def search(q: str = Query(min_length=1), page: int = 1) -> dict[str, Any]:
 
 
 class DiscoverIn(BaseModel):
+    q: str | None = None  # Suchbegriff: Suche statt Discover, Filter werden lokal angewandt
     media_type: str | None = None
     year_from: int | None = None
     year_to: int | None = None
@@ -218,6 +219,12 @@ async def post_discover(body: DiscoverIn) -> dict[str, Any]:
         return await discover.run(body.model_dump())
     except tmdb.TMDBError as e:
         raise _err(e)
+
+
+@router.get("/subs")
+async def subs() -> dict[str, Any]:
+    """Abo-Übersicht: welche Bibliothekstitel laufen bei aktiven bzw. nicht aktiven Anbietern."""
+    return library.provider_coverage()
 
 
 @router.get("/for-you")

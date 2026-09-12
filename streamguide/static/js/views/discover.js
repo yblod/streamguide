@@ -1,4 +1,5 @@
-// Entdecken: umfassender Filter (Jahr, Genre, IMDb, Land, FSK, Verfügbarkeit).
+// Entdecken: Suche + umfassender Filter (Jahr, Genre, IMDb, Land, FSK, Verfügbarkeit). Mit Suchbegriff werden die
+// Suchtreffer nach denselben Filtern verfeinert, ohne Suchbegriff arbeitet Discover wie gewohnt.
 import { api } from '../api.js';
 import { h, grid, card, skeletons, toast, empty } from '../ui.js';
 
@@ -14,8 +15,9 @@ function loadState() {
   try { const st = { ...DEFAULT, ...JSON.parse(localStorage.getItem('discover') || '{}') }; if (!Array.isArray(st.fsk)) st.fsk = []; delete st.exclude_languages; if (!Array.isArray(st.languages)) st.languages = []; if (!Array.isArray(st.exclude_genres)) st.exclude_genres = []; if (!Array.isArray(st.exclude_countries)) st.exclude_countries = []; delete st.fsk_max; delete st.runtime_max; return st; } catch { return { ...DEFAULT }; }
 }
 
-export async function render(root) {
+export async function render(root, params = {}) {
   const f = loadState();
+  f.q = params.q || '';  // Suchbegriff wird nicht gespeichert: leeres Feld = normales Entdecken
   let genresByType = { movie: [], tv: [] };
   try { genresByType = await api.genres(); } catch { /* ohne Genres weiter */ }
 
@@ -23,7 +25,7 @@ export async function render(root) {
   const more = h('div', { class: 'row', style: { justifyContent: 'center', marginTop: '18px' } });
   let nextPage = null, items = [], loading = false;
 
-  const save = () => localStorage.setItem('discover', JSON.stringify(f));
+  const save = () => { const { q, ...rest } = f; localStorage.setItem('discover', JSON.stringify(rest)); };
 
   const genreChips = h('div', { class: 'chips' });
   const renderGenres = () => {
@@ -101,7 +103,7 @@ export async function render(root) {
       h('div', { class: 'row' },
         h('label', { class: 'toggle small' }, h('input', { type: 'checkbox', checked: f.hide_seen, onChange: (e) => { f.hide_seen = e.target.checked; run(); } }), h('span', { class: 'sw' }), 'Gesehene ausblenden'),
         h('label', { class: 'toggle small', title: 'Filme auf der Watchlist und verfolgte Serien ausblenden' }, h('input', { type: 'checkbox', checked: f.hide_listed, onChange: (e) => { f.hide_listed = e.target.checked; run(); } }), h('span', { class: 'sw' }), 'Gemerkte ausblenden'),
-        h('button', { class: 'btn sm ghost', onClick: () => { Object.assign(f, DEFAULT, { genres: [], exclude_genres: [], countries: [], exclude_countries: [], fsk: [], adult: false, languages: [] }); save(); render(root); } }, 'Zurücksetzen'))),
+        h('button', { class: 'btn sm ghost', title: 'Alle Filter und den Suchbegriff auf Standard zurücksetzen', onClick: () => { localStorage.removeItem('discover'); seq += 1; history.replaceState(null, '', '#/discover'); root.innerHTML = ''; render(root, {}); } }, 'Zurücksetzen'))),
     h('div', { class: 'filters' },
       h('label', { class: 'field' }, 'Erscheinungsjahr', h('div', { class: 'range' }, num('year_from', 'von', { min: 1900, max: 2030 }), '–', num('year_to', 'bis', { min: 1900, max: 2030 }))),
       h('label', { class: 'field' }, 'IMDb mindestens', sel('imdb_min', [['', 'egal'], ['5', '5.0+'], ['6', '6.0+'], ['6.5', '6.5+'], ['7', '7.0+'], ['7.5', '7.5+'], ['8', '8.0+'], ['8.5', '8.5+']])),
@@ -117,10 +119,27 @@ export async function render(root) {
   );
   renderGenres();
 
-  root.append(h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Entdecken 🧭'), h('div', { class: 'sub' }, 'Filtere das Angebot deiner Anbieter nach Jahr, Genre, IMDb-Bewertung, Land und FSK.'))), panel, results, more);
+  const searchInput = h('input', { type: 'search', placeholder: 'Film oder Serie suchen … (leer = Angebot deiner Anbieter entdecken)', value: f.q });
+  let searchTimer;
+  const applySearch = () => {
+    clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (q === f.q) return;
+    f.q = q;
+    history.replaceState(null, '', q ? `#/discover?q=${encodeURIComponent(q)}` : '#/discover');
+    run();
+  };
+  searchInput.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(applySearch, 450); });
+  searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') applySearch(); });
+  const searchBar = h('div', { class: 'glass panel', style: { marginBottom: '14px' } },
+    h('div', { class: 'searchbar' }, searchInput,
+      h('button', { class: 'btn primary', onClick: applySearch }, 'Suchen'),
+      h('button', { class: 'btn ghost', title: 'Suchbegriff löschen', onClick: () => { searchInput.value = ''; applySearch(); } }, '✕')));
+
+  root.append(h('div', { class: 'page-head' }, h('div', {}, h('h1', {}, 'Entdecken 🧭'), h('div', { class: 'sub' }, 'Suche nach Titeln oder filtere das Angebot deiner Anbieter nach Jahr, Genre, IMDb-Bewertung, Land und FSK.'))), searchBar, panel, results, more);
 
   const payload = (page) => ({
-    media_type: f.media_type || null, year_from: f.year_from ? +f.year_from : null, year_to: f.year_to ? +f.year_to : null,
+    q: f.q || null, media_type: f.media_type || null, year_from: f.year_from ? +f.year_from : null, year_to: f.year_to ? +f.year_to : null,
     genres: f.genres, exclude_genres: f.exclude_genres || [], countries: f.countries, exclude_countries: f.exclude_countries || [], imdb_min: f.imdb_min ? +f.imdb_min : null, fsk: f.fsk || [], adult: !!f.adult, languages: f.languages || [],
     availability: f.availability, sort: f.sort, hide_seen: f.hide_seen, hide_listed: !!f.hide_listed, min_votes: +f.min_votes || 50, runtime_min: f.runtime_min ? +f.runtime_min : null, page,
   });
@@ -155,8 +174,8 @@ export async function render(root) {
       if (f.hide_seen) items = items.filter((x) => !['watched', 'disliked', 'dropped'].includes(x.user?.status));
       if (f.hide_listed) items = items.filter((x) => !['watchlist', 'watching'].includes(x.user?.status));
       draw();
-    }, emptyText: 'Keine Treffer – Filter lockern oder Verfügbarkeit auf „Alles“ stellen.' }));
-    document.getElementById('disc-count').textContent = `${uniq.length} Treffer${nextPage ? '+' : ''}`;
+    }, emptyText: f.q ? 'Keine Treffer für diesen Begriff mit den aktuellen Filtern – Verfügbarkeit auf „Alles“ stellen oder Gesehene einblenden.' : 'Keine Treffer – Filter lockern oder Verfügbarkeit auf „Alles“ stellen.' }));
+    document.getElementById('disc-count').textContent = `${uniq.length} Treffer${nextPage ? '+' : ''}${f.q ? ` für „${f.q}“` : ''}`;
     more.innerHTML = '';
     if (nextPage) more.append(h('button', { class: 'btn primary', onClick: () => run(true) }, 'Mehr laden'));
   }
